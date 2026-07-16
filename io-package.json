@@ -1,0 +1,153 @@
+{
+  "common": {
+    "name": "anycubic",
+    "version": "0.0.1",
+    "news": {
+      "0.0.1": {
+        "en": "init",
+        "de": "init"
+      }
+    },
+    "titleLang": {
+      "en": "Anycubic",
+      "de": "Anycubic",
+      "ru": "Anycubic",
+      "pt": "Anycubic",
+      "nl": "Anycubic",
+      "fr": "Anycubic",
+      "it": "Anycubic",
+      "es": "Anycubic",
+      "pl": "Anycubic",
+      "zh-cn": "Anycubic",
+      "uk": "Anycubic"
+    },
+    "desc": {
+      "en": "anycubic adapter for ioBroker",
+      "de": "anycubic-Adapter für ioBroker",
+      "ru": "Адаптер anycubic для ioBroker",
+      "pt": "Adaptador anycubic para ioBroker",
+      "nl": "anycubic-adapter voor ioBroker",
+      "fr": "Adaptateur anycubic pour ioBroker",
+      "it": "Adattatore anycubic per ioBroker",
+      "es": "Adaptador anycubic para ioBroker",
+      "pl": "Adapter anycubic do ioBroker",
+      "zh-cn": "用于 ioBroker 的 anycubic 适配器",
+      "uk": "Адаптер anycubic для ioBroker"
+    },
+    "authors": [
+      "arteck <arteck@outlook.com>"
+    ],
+    "keywords": [
+      "3d printer",
+      "anycubic",
+      "kobra s1"
+    ],
+    "licenseInformation": {
+      "license": "MIT",
+      "type": "free"
+    },
+    "platform": "Javascript/Node.js",
+    "icon": "anycubic.png",
+    "enabled": false,
+    "extIcon": "https://raw.githubusercontent.com/arteck/ioBroker.anycubic/main/admin/anycubic.png",
+    "readme": "https://github.com/arteck/ioBroker.anycubic/blob/main/README.md",
+    "loglevel": "info",
+    "mode": "daemon",
+    "type": "hardware",
+    "compact": true,
+    "supportedMessages": {
+      "deviceManager": true
+    },
+    "stopTimeout": 2000,
+    "tier": 2,
+    "connectionType": "local",
+    "dataSource": "push",
+    "adminUI": {
+      "config": "json"
+    },
+    "adminTab": {
+      "name": {
+        "en": "anycubic",
+        "de": "anycubic",
+        "ru": "anycubic",
+        "pt": "anycubic",
+        "nl": "anycubic",
+        "fr": "anycubic",
+        "it": "anycubic",
+        "es": "anycubic",
+        "pl": "anycubic",
+        "zh-cn": "anycubic"
+      },
+      "link": "%webUIScheme%://%webUIServer%:%webUIPort%"
+    },
+    "localLinks": {
+      "_default": {
+        "link": "%webUIScheme%://%webUIServer%:%webUIPort%"
+      }
+    },
+    "dependencies": [
+      {
+        "js-controller": ">=6.0.11"
+      }
+    ],
+    "globalDependencies": [
+      {
+        "admin": ">=7.6.20"
+      }
+    ],
+    "plugins": {
+      "docker": {
+        "iobDockerComposeFiles": [
+          "docker-compose.yaml"
+        ]
+      }
+    },
+    "messages": []
+  },
+  "native": {
+    "connectionType": "ws",
+    "wsScheme": "ws",
+    "wsServerIP": "",
+    "wsServerPort": 3000,
+    "wsTokenEnabled": false,
+    "wsToken": "",
+    "webUIScheme": "http",
+    "webUIServer": "",
+    "webUIPort": 8091,
+    "showNodeInfoMessage": true,
+    "useEventInDesc": false,
+    "wakeUpInfo": false,
+    "newTypeEvent": true,
+    "wsOnStart": true
+  },
+  "protectedNative": [
+    "wsToken"
+  ],
+  "encryptedNative": [
+    "wsToken"
+  ],
+  "objects": [],
+  "instanceObjects": [
+    {
+      "_id": "info",
+      "type": "channel",
+      "common": {
+        "name": "Information"
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.connection",
+      "type": "state",
+      "common": {
+        "role": "indicator.connected",
+        "name": "anycubic connected",
+        "type": "boolean",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    }    
+  ]
+}
