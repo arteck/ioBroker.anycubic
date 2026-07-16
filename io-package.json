@@ -56,7 +56,7 @@
     "type": "hardware",
     "compact": true,
     "supportedMessages": {
-      "deviceManager": true
+      "deviceManager": false
     },
     "stopTimeout": 2000,
     "tier": 2,
