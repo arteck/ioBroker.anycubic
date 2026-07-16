@@ -3,7 +3,6 @@
 const core = require('@iobroker/adapter-core');
 const {StatesController} = require('./lib/statesController');
 const {WebsocketController} = require('./lib/websocketController');
-const {Helper} = require('./lib/helper');
 
 
 class anycubic extends core.Adapter {
@@ -14,15 +13,12 @@ class anycubic extends core.Adapter {
         });
 
         // Instanz-State statt Modul-globale Variablen
-        this.deviceCache = {};
+
         this.websocketController = null;
         this.statesController = null;
-        this.helper = null;
+
         this.messageParseMutex = Promise.resolve();
         this.parseOptions = {write: false};
-        this.startListening = false;
-        this.allNodesCreated = false;
-        this.nodeCache = {};
 
         this.on('ready', () => {
             this.onReady().catch((e) => this.log.error(`onReady error: ${e}`));
@@ -39,15 +35,6 @@ class anycubic extends core.Adapter {
         this.statesController = new StatesController(this);
 
         this.setStateChanged('info.connection', false, true);
-        await this.statesController.setAllAvailableToFalse();
-
-        this.helper = new Helper(this, this.deviceCache);
-
-        if (this.config.wsOnStart) {
-            this.setStateChanged('info.sendMessageAllowed', true, true);
-        }
-
-        this.setStateChanged('info.debugmessages', '', true);
 
         // WebSocket-Verbindung
         if (!this.config.wsServerIP) {
@@ -69,7 +56,6 @@ class anycubic extends core.Adapter {
         }
 
         wsClient.on('open', () => {
-            this.startListening = true;
         });
 
         wsClient.on('message', (message) => {
@@ -78,10 +64,6 @@ class anycubic extends core.Adapter {
 
         wsClient.on('close', async () => {
             this.setStateChanged('info.connection', false, true);
-            this.startListening = false;
-            this.allNodesCreated = false;
-            this.deviceCache = {};
-            this.nodeCache = {};
             this.log.info('Websocket connection closed. Attempting to reconnect...');
         });
     }

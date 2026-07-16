@@ -95,13 +95,7 @@
         "admin": ">=7.6.20"
       }
     ],
-    "plugins": {
-      "docker": {
-        "iobDockerComposeFiles": [
-          "docker-compose.yaml"
-        ]
-      }
-    },
+    "plugins": {},
     "messages": []
   },
   "native": {
