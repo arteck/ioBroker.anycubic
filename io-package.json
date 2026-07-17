@@ -128,6 +128,19 @@
         "def": false
       },
       "native": {}
+    },
+    {
+      "_id": "info.online",
+      "type": "state",
+      "common": {
+        "role": "state",
+        "name": "is anycubic online",
+        "type": "boolean",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
     }
   ]
 }
