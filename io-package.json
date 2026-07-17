@@ -99,27 +99,13 @@
     "messages": []
   },
   "native": {
-    "connectionType": "ws",
-    "wsScheme": "ws",
     "wsServerIP": "",
-    "wsServerPort": 3000,
-    "wsTokenEnabled": false,
-    "wsToken": "",
-    "webUIScheme": "http",
+    "wsServerPort": 7125,
     "webUIServer": "",
-    "webUIPort": 8091,
-    "showNodeInfoMessage": true,
-    "useEventInDesc": false,
-    "wakeUpInfo": false,
-    "newTypeEvent": true,
-    "wsOnStart": true
+    "webUIPort": 4409
   },
-  "protectedNative": [
-    "wsToken"
-  ],
-  "encryptedNative": [
-    "wsToken"
-  ],
+  "protectedNative": [ ],
+  "encryptedNative": [ ],
   "objects": [],
   "instanceObjects": [
     {
@@ -142,6 +128,6 @@
         "def": false
       },
       "native": {}
-    }    
+    }
   ]
 }

@@ -3,7 +3,9 @@
 const core = require('@iobroker/adapter-core');
 const {StatesController} = require('./lib/statesController');
 const {WebsocketController} = require('./lib/websocketController');
+const {Helper} = require('./lib/helper');
 
+let obj102_done = false;
 
 class anycubic extends core.Adapter {
     constructor(options) {
@@ -16,9 +18,10 @@ class anycubic extends core.Adapter {
 
         this.websocketController = null;
         this.statesController = null;
-
+        this.subscribeParameter = {};
         this.messageParseMutex = Promise.resolve();
         this.parseOptions = {write: false};
+        this.helper = new Helper(this);
 
         this.on('ready', () => {
             this.onReady().catch((e) => this.log.error(`onReady error: ${e}`));
@@ -33,7 +36,6 @@ class anycubic extends core.Adapter {
 
     async onReady() {
         this.statesController = new StatesController(this);
-
         this.setStateChanged('info.connection', false, true);
 
         // WebSocket-Verbindung
@@ -56,6 +58,15 @@ class anycubic extends core.Adapter {
         }
 
         wsClient.on('open', () => {
+            this.log.info('Connect to anycubic over websocket connection.');
+
+            this.websocketController.send(JSON.stringify({
+                jsonrpc: "2.0",
+                method:"printer.objects.list",
+                id: 100
+            }));
+
+            this.setStateChanged('info.connection', true, true);
         });
 
         wsClient.on('message', (message) => {
@@ -77,14 +88,90 @@ class anycubic extends core.Adapter {
         try {
             let messageObj = JSON.parse(message);
 
-            this.log.debug(`--->>> fromZ2W_RAW_1 -> ${JSON.stringify(messageObj)}`);
+            this.log.debug(`--->>> fromAnycubic_RAW_1 -> ${JSON.stringify(messageObj)}`);
 
-            const type = messageObj?.type;
+            const method = messageObj?.method;
 
-            // TODO: Process message based on type
-            if (!type) {
-                this.log.warn(`<anycubic> received message without type: ${JSON.stringify(messageObj)}`);
+            let request;
+
+            if (messageObj.id == 100) {
+                const param = await this.helper.removeGCodeObjects(messageObj.result.objects);
+                const obj = {};
+                for (const p of param) {
+                    obj[p] = null;
+                }
+                this.subscribeParameter = {objects: obj};
+
+                let shouldQuery = true;
+                if (this.config.energy_id) {
+                    try {
+                        const s = await this.getForeignStateAsync(this.config.energy_id);
+                        shouldQuery = s && s.val === true;
+                    } catch (e) {
+                        this.log.warn(`Could not read energy state ${this.config.energy_id}: ${e.message}`);
+                    }
+                }
+
+                if (shouldQuery) {
+                    this.websocketController.send(JSON.stringify({
+                        jsonrpc: "2.0",
+                        method: "printer.objects.query",
+                        params: {
+                            objects: {
+                                "*": null
+                            }
+                        },
+                        id: 102
+                    }));
+                }
             }
+
+            if (messageObj.id == 102) {
+                if (!obj102_done) {
+                    const status = messageObj.result.status;
+
+                    for (const key of Object.keys(status)) {
+                        if (key !== '*') {
+                            if (!(key in this.subscribeParameter.objects)) {
+                                this.subscribeParameter.objects[key] = null;
+                            }
+                        }
+                    }
+
+                    // Only subscribe if energy state is true (or not configured)
+                    let shouldSubscribe = true;
+                    if (this.config.energy_id) {
+                        try {
+                            const s = await this.getForeignStateAsync(this.config.energy_id);
+                            shouldSubscribe = s && s.val === true;
+                        } catch (e) {
+                            this.log.warn(`Could not read energy state ${this.config.energy_id}: ${e.message}`);
+                        }
+                    }
+
+                    if (shouldSubscribe) {
+                        this.websocketController.send(JSON.stringify({
+                            jsonrpc: "2.0",
+                            method: "printer.objects.subscribe",
+                            params: this.subscribeParameter,
+                            id: 1
+                        }));
+                    }
+
+                    obj102_done = true;
+                }
+            }
+
+            if (messageObj?.method) {
+                if (method === undefined ) {
+                    request = messageObj.result.status;
+                    await this.helper.parseStart(request, this.parseOptions);
+                } else {
+                    request = messageObj.params;
+                    await this.helper.parseMethod(request, this.parseOptions);
+                }
+            }
+
         } catch (err) {
             this.log.error(err);
             this.log.error(`<anycubic> error message -->> ${message}`);
@@ -101,15 +188,6 @@ class anycubic extends core.Adapter {
                     this.log.error(e);
                 }
             }
-
-            try {
-                if (this.statesController) {
-                    await this.statesController.setAllAvailableToFalse();
-                }
-            } catch (e) {
-                this.log.error(e);
-            }
-
             this.setStateChanged('info.connection', false, true);
         } finally {
             callback();
@@ -118,6 +196,35 @@ class anycubic extends core.Adapter {
 
 
     async onStateChange(id, state) {
+        if (!state || state.ack) {
+return;
+}
+
+        // If energy state changed to true, re-trigger subscription
+        if (this.config.energy_id && id === this.config.energy_id && state.val === true) {
+            this.log.debug(`Energy state changed to true - re-triggering printer subscription`);
+            obj102_done = false;
+            this.websocketController.send(JSON.stringify({
+                jsonrpc: "2.0",
+                method: "printer.objects.list",
+                params: {},
+                id: 100
+            }));
+            return;
+        }
+
+        // If energy state changed to false, close the websocket connection
+        if (this.config.energy_id && id === this.config.energy_id && state.val === false) {
+            this.log.debug(`Energy state changed to false - closing websocket connection`);
+            obj102_done = false;
+            try {
+                this.websocketController.closeConnection();
+            } catch (e) {
+                this.log.warn(`Error closing websocket: ${e.message}`);
+            }
+            return;
+        }
+
         if (!this.allNodesCreated) {
             return;
         }
