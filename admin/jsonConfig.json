@@ -36,7 +36,7 @@
       "items": {
         "header_Start": {
           "type": "header",
-          "text": "anycubic adapter settings",
+          "text": "Anycubic adapter settings",
           "size": 2
         },
         "_textStart": {
@@ -69,7 +69,7 @@
         },
         "connectionHeader": {
           "type": "header",
-          "text": "Select and configure your anycubic connection",
+          "text": "Select and configure your Anycubic connection",
           "size": 2,
           "newLine": true
         },
@@ -95,7 +95,7 @@
         },
         "webUIHeader": {
           "type": "header",
-          "text": "Configure your anycubic WebUi connection",
+          "text": "Configure your Anycubic WebUi connection",
           "size": 2,
           "newLine": true
         },
@@ -136,6 +136,18 @@
           "md": 6,
           "lg": 6,
           "xl": 6
+        },
+         "waitForPrinter": {
+          "type": "number",
+          "label": "wait x sec. after state is on",
+          "help": "wait x sec",
+           "default": 50,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 4,
+          "xl": 4,
+          "newLine": false
         }
       }
     }

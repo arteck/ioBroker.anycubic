@@ -19,7 +19,7 @@
 ## Changelog
 
 ### **WORK IN PROGRESS**
-* (arteck) initial commit
+* (arteck) first release
 
 ## License
 

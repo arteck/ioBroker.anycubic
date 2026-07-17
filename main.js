@@ -1,7 +1,6 @@
 'use strict';
 
 const core = require('@iobroker/adapter-core');
-const {StatesController} = require('./lib/statesController');
 const {WebsocketController} = require('./lib/websocketController');
 const {Helper} = require('./lib/helper');
 
@@ -17,7 +16,6 @@ class anycubic extends core.Adapter {
         // Instanz-State statt Modul-globale Variablen
 
         this.websocketController = null;
-        this.statesController = null;
         this.subscribeParameter = {};
         this.messageParseMutex = Promise.resolve();
         this.parseOptions = {write: false};
@@ -35,7 +33,6 @@ class anycubic extends core.Adapter {
     }
 
     async onReady() {
-        this.statesController = new StatesController(this);
         this.setStateChanged('info.connection', false, true);
 
         // WebSocket-Verbindung
@@ -65,8 +62,8 @@ class anycubic extends core.Adapter {
                 method:"printer.objects.list",
                 id: 100
             }));
-
             this.setStateChanged('info.connection', true, true);
+            this.setStateChanged('info.online', true, true);
         });
 
         wsClient.on('message', (message) => {
@@ -75,6 +72,7 @@ class anycubic extends core.Adapter {
 
         wsClient.on('close', async () => {
             this.setStateChanged('info.connection', false, true);
+            this.setStateChanged('info.online', false, true);
             this.log.info('Websocket connection closed. Attempting to reconnect...');
         });
     }
@@ -202,14 +200,23 @@ return;
 
         // If energy state changed to true, re-trigger subscription
         if (this.config.energy_id && id === this.config.energy_id && state.val === true) {
-            this.log.debug(`Energy state changed to true - re-triggering printer subscription`);
+            this.log.debug(`Energy state changed to true - (re)starting printer connection`);
             obj102_done = false;
-            this.websocketController.send(JSON.stringify({
-                jsonrpc: "2.0",
-                method: "printer.objects.list",
-                params: {},
-                id: 100
-            }));
+
+            // Close existing connection first
+            try {
+                this.websocketController.closeConnection();
+            } catch (e) {
+                // ignore
+            }
+
+            const waitSeconds = parseInt(this.config.waitForPrinter) || 0;
+            if (waitSeconds > 0) {
+                this.log.debug(`Waiting ${waitSeconds}s for printer to boot up...`);
+                await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+            }
+
+            this.startWebsocket();
             return;
         }
 
@@ -219,6 +226,7 @@ return;
             obj102_done = false;
             try {
                 this.websocketController.closeConnection();
+                this.setStateChanged('info.online', false, true);
             } catch (e) {
                 this.log.warn(`Error closing websocket: ${e.message}`);
             }
