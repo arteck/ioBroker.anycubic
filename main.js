@@ -92,68 +92,41 @@ class anycubic extends core.Adapter {
         }
     }
 
-     startWebsocket() {
+    startWebsocket() {
         this.websocketController = new WebsocketController(this);
-        const wsClient = this.websocketController.initWsClient();
-
-        if (!wsClient) {
-            this.log.error('<anycubic> initWsClient returned null — websocket not started.');
-            return;
-        }
-
-        wsClient.on('open', () => {
-            this.log.info('Connect to anycubic over websocket connection.');
-
-            this.websocketController.send(JSON.stringify({
-                jsonrpc: "2.0",
-                method: "printer.objects.subscribe",
-                params: {
-                    objects: {
-                        "motion_report": null,
-                        "configfile": null,
-                        "heaters": null,
-                        "respond": null,
-                        "display_status": null,
-                        "exclude_object": null,
-                        "extruder": null,
-                        "fan": null,
-                        "heater_bed": null,
-                        "mcu": null,
-                        "mcu nozzle_mcu": null,
-                        "ota_filament_hub": null,
-                        "pause_resume": null,
-                        "pause_resume/cancel": null,
-                        "print_stats": null,
-                        "toolhead": null,
-                        "verify_heater extrude": null,
-                        "verify_heater heater_bed": null,
-                        "virtual_sdcard": null,
-                        "webhooks": null,
-                        "bed_mesh": null,
-                        "bed_mesh default": null,
-                        "bed_mesh \"default\"": null,
-                        "idle_timeout": null,
-                        "fan_generic air_filter_fan": null,
-                        "fan_generic box_fan": null,
-                        "mmu_machine": null,
-                        "mmu": null,
-                    }
-                },
-                id: 102
-            }));
-            this.setStateChanged('info.connection', true, true);
-            this.setStateChanged('info.online', true, true);
-        });
-
-        wsClient.on('message', (message) => {
-            this.messageParse(message);
-        });
-
-        wsClient.on('close', async () => {
-            this.setStateChanged('info.connection', false, true);
-            this.setStateChanged('info.online', false, true);
-            this.log.info('Websocket connection closed. Attempting to reconnect...');
-        });
+        this.websocketController.start(
+            {
+                "motion_report": null,
+                "configfile": null,
+                "heaters": null,
+                "respond": null,
+                "display_status": null,
+                "exclude_object": null,
+                "extruder": null,
+                "fan": null,
+                "heater_bed": null,
+                "mcu": null,
+                "mcu nozzle_mcu": null,
+                "ota_filament_hub": null,
+                "pause_resume": null,
+                "pause_resume/cancel": null,
+                "print_stats": null,
+                "toolhead": null,
+                "verify_heater extrude": null,
+                "verify_heater heater_bed": null,
+                "virtual_sdcard": null,
+                "webhooks": null,
+                "bed_mesh": null,
+                "bed_mesh default": null,
+                "bed_mesh \"default\"": null,
+                "idle_timeout": null,
+                "fan_generic air_filter_fan": null,
+                "fan_generic box_fan": null,
+                "mmu_machine": null,
+                "mmu": null,
+            },
+            (message) => this.messageParse(message)
+        );
     }
 
     async onStateChange(id, state) {
