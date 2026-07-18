@@ -161,7 +161,10 @@ class anycubic extends core.Adapter {
             this.log.debug(`Energy state changed to false - closing websocket connection`);
             obj102_done = false;
             try {
-                this.websocketController.closeConnection();
+                if (this.websocketController) {
+                    this.websocketController.closeConnection();
+                }
+                this.setStateChanged('info.connection', false, true);
                 this.setStateChanged('info.online', false, true);
             } catch (e) {
                 this.log.warn(`Error closing websocket: ${e.message}`);
