@@ -3,6 +3,7 @@
 const core = require('@iobroker/adapter-core');
 const {WebsocketController} = require('./lib/websocketController');
 const {Helper} = require('./lib/helper');
+const {Command} = require('./lib/command');
 
 let obj102_done = false;
 
@@ -19,6 +20,7 @@ class anycubic extends core.Adapter {
         this.messageParseMutex = Promise.resolve();
         this.parseOptions = {write: false};
         this.helper = new Helper(this);
+        this.command = new Command(this);
 
         this.on('ready', () => {
             this.onReady().catch((e) => this.log.error(`onReady error: ${e}`));
@@ -41,72 +43,12 @@ class anycubic extends core.Adapter {
         }
         this.energyId = this.config.energy_id || null;
         this.startWebsocket();
+
+        // Command-States anlegen
+        await this.command.createCommandStates();
     }
 
 
-    startWebsocket() {
-        this.websocketController = new WebsocketController(this);
-        const wsClient = this.websocketController.initWsClient();
-
-        if (!wsClient) {
-            this.log.error('<anycubic> initWsClient returned null — websocket not started.');
-            return;
-        }
-
-        wsClient.on('open', () => {
-            this.log.info('Connect to anycubic over websocket connection.');
-
-            this.websocketController.send(JSON.stringify({
-                jsonrpc: "2.0",
-                method: "printer.objects.subscribe",
-                        params: {
-                            objects: {
-                                  "motion_report": null,
-                                  "configfile": null,
-                                  "heaters": null,
-                                  "respond": null,
-                                  "display_status": null,
-                                  "exclude_object": null,
-                                  "extruder": null,
-                                  "fan": null,
-                                  "heater_bed": null,
-                                  "mcu": null,
-                                  "mcu nozzle_mcu": null,
-                                  "ota_filament_hub": null,
-                                  "pause_resume": null,
-                                  "pause_resume/cancel": null,
-                                  "print_stats": null,
-                                  "toolhead": null,
-                                  "verify_heater extrude": null,
-                                  "verify_heater heater_bed": null,
-                                  "virtual_sdcard": null,
-                                  "webhooks": null,
-                                  "bed_mesh": null,
-                                  "bed_mesh default": null,
-                                  "bed_mesh \"default\"": null,
-                                  "idle_timeout": null,
-                                  "fan_generic air_filter_fan": null,
-                                  "fan_generic box_fan": null,
-                                  "mmu_machine": null,
-                                  "mmu": null,
-                                }
-                        },
-                id: 102
-            }));
-            this.setStateChanged('info.connection', true, true);
-            this.setStateChanged('info.online', true, true);
-        });
-
-        wsClient.on('message', (message) => {
-            this.messageParse(message);
-        });
-
-        wsClient.on('close', async () => {
-            this.setStateChanged('info.connection', false, true);
-            this.setStateChanged('info.online', false, true);
-            this.log.info('Websocket connection closed. Attempting to reconnect...');
-        });
-    }
 
     async messageParse(message) {
         const lock = new Promise((resolve) => resolve());
@@ -150,11 +92,74 @@ class anycubic extends core.Adapter {
         }
     }
 
+     startWebsocket() {
+        this.websocketController = new WebsocketController(this);
+        const wsClient = this.websocketController.initWsClient();
+
+        if (!wsClient) {
+            this.log.error('<anycubic> initWsClient returned null — websocket not started.');
+            return;
+        }
+
+        wsClient.on('open', () => {
+            this.log.info('Connect to anycubic over websocket connection.');
+
+            this.websocketController.send(JSON.stringify({
+                jsonrpc: "2.0",
+                method: "printer.objects.subscribe",
+                params: {
+                    objects: {
+                        "motion_report": null,
+                        "configfile": null,
+                        "heaters": null,
+                        "respond": null,
+                        "display_status": null,
+                        "exclude_object": null,
+                        "extruder": null,
+                        "fan": null,
+                        "heater_bed": null,
+                        "mcu": null,
+                        "mcu nozzle_mcu": null,
+                        "ota_filament_hub": null,
+                        "pause_resume": null,
+                        "pause_resume/cancel": null,
+                        "print_stats": null,
+                        "toolhead": null,
+                        "verify_heater extrude": null,
+                        "verify_heater heater_bed": null,
+                        "virtual_sdcard": null,
+                        "webhooks": null,
+                        "bed_mesh": null,
+                        "bed_mesh default": null,
+                        "bed_mesh \"default\"": null,
+                        "idle_timeout": null,
+                        "fan_generic air_filter_fan": null,
+                        "fan_generic box_fan": null,
+                        "mmu_machine": null,
+                        "mmu": null,
+                    }
+                },
+                id: 102
+            }));
+            this.setStateChanged('info.connection', true, true);
+            this.setStateChanged('info.online', true, true);
+        });
+
+        wsClient.on('message', (message) => {
+            this.messageParse(message);
+        });
+
+        wsClient.on('close', async () => {
+            this.setStateChanged('info.connection', false, true);
+            this.setStateChanged('info.online', false, true);
+            this.log.info('Websocket connection closed. Attempting to reconnect...');
+        });
+    }
 
     async onStateChange(id, state) {
         if (!state || state.ack) {
-return;
-}
+            return;
+        }
 
         // If energy state changed to true, re-trigger subscription
         if (this.config.energy_id && id === this.config.energy_id && state.val === true) {
@@ -188,6 +193,11 @@ return;
             } catch (e) {
                 this.log.warn(`Error closing websocket: ${e.message}`);
             }
+            return;
+        }
+
+        // === Command States ausführen (ausgelagert in command.js) ===
+        if (await this.command.handleCommand(id, state)) {
             return;
         }
 
