@@ -34,7 +34,7 @@ class anycubic extends core.Adapter {
     }
 
     async onReady() {
-        this.setStateChanged('info.connection', false, true);
+        this.setStateChanged('info.connection', true, true);
         this.setStateChanged('info.online', true, true);
 
         // WebSocket-Verbindung
@@ -166,7 +166,6 @@ class anycubic extends core.Adapter {
                 if (this.websocketController) {
                     this.websocketController.closeConnection();
                 }
-                this.setStateChanged('info.connection', false, true);
                 this.setStateChanged('info.online', false, true);
             } catch (e) {
                 this.log.warn(`Error closing websocket: ${e.message}`);
