@@ -43,7 +43,19 @@ class anycubic extends core.Adapter {
             return;
         }
         this.energyId = this.config.energy_id || null;
-        this.startWebsocket();
+
+        // Prüfen ob energy_id konfiguriert ist und der Wert false ist
+        if (this.energyId) {
+            const energyState = await this.getStateAsync(this.energyId);
+            if (energyState && energyState.val === false) {
+                this.log.info('Energy is off - not starting WebSocket connection. Toggle energy to connect.');
+                this.setStateChanged('info.online', false, true);
+                await this.command.createCommandStates();
+                return;
+            }
+        }
+
+        this.startWebsocket(false);
 
         // Command-States anlegen
         await this.command.createCommandStates();
@@ -94,7 +106,7 @@ class anycubic extends core.Adapter {
         }
     }
 
-    startWebsocket() {
+    startWebsocket(allowRetry = false) {
         this.websocketController = new WebsocketController(this);
         this.websocketController.start(
             {
@@ -127,7 +139,8 @@ class anycubic extends core.Adapter {
                 "mmu_machine": null,
                 "mmu": null,
             },
-            (message) => this.messageParse(message)
+            (message) => this.messageParse(message),
+            allowRetry
         );
     }
 
@@ -154,7 +167,7 @@ class anycubic extends core.Adapter {
                 await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
             }
 
-            this.startWebsocket();
+            this.startWebsocket(true);
             return;
         }
 
