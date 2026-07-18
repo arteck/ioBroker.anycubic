@@ -137,7 +137,7 @@
           "lg": 6,
           "xl": 6
         },
-         "waitForPrinter": {
+        "waitForPrinter": {
           "type": "number",
           "label": "wait x sec. after state is on",
           "help": "wait x sec",
@@ -146,8 +146,15 @@
           "sm": 12,
           "md": 6,
           "lg": 4,
-          "xl": 4,
-          "newLine": false
+          "xl": 4
+        },
+        "waitForPong": {
+          "type": "number",
+          "min": 1,
+          "max": 100,
+          "default": 5,
+          "label": "waitForPong",
+          "description": "Anzahl fehlender Pongs bis Printer offline"
         }
       }
     }

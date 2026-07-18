@@ -35,7 +35,7 @@ class anycubic extends core.Adapter {
 
     async onReady() {
         this.setStateChanged('info.connection', true, true);
-        this.setStateChanged('info.online', true, true);
+        this.setStateChanged('info.online', false, true);
 
         // WebSocket-Verbindung
         if (!this.config.wsServerIP) {
