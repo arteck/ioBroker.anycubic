@@ -62,7 +62,6 @@ class anycubic extends core.Adapter {
     }
 
 
-
     async messageParse(message) {
         const lock = new Promise((resolve) => resolve());
         const prev = this.messageParseMutex;
@@ -199,39 +198,6 @@ class anycubic extends core.Adapter {
             if (id.endsWith('info.debugId')) {
                 this.setStateChanged(id, state.val, true);
                 return;
-            }
-
-            const obj = await this.getObjectAsync(id);
-            if (obj) {
-                const nativeObj = obj.native || {};
-
-                const m = id.match(/nodeID_0*(\d+)/i);
-                if (!m) {
-                    this.log.warn(`<anycubic> Could not extract nodeId from state id: ${id}`);
-                    return;
-                }
-                const nodeId = Number(m[1]);
-
-                const message = {
-                    messageId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                    command: 'node.set_value',
-                    nodeId,
-                    valueId: nativeObj.valueId,
-                    value: state.val,
-                };
-
-                const sendMessageAllowed = await this.getStateAsync('info.sendMessageAllowed');
-
-                if (sendMessageAllowed && sendMessageAllowed.val === true) {
-                    if (this.websocketController) {
-                        this.websocketController.send(JSON.stringify(message));
-                    } else {
-                        this.log.warn('<anycubic> websocketController not initialised, cannot send message.');
-                    }
-                }
-
-                this.setStateChanged('info.debugmessages', JSON.stringify(message), true);
-                this.log.debug(`<anycubic> message onStateChange ${JSON.stringify(message)}`);
             }
         }
     }
