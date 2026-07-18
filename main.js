@@ -14,7 +14,6 @@ class anycubic extends core.Adapter {
         });
 
         // Instanz-State statt Modul-globale Variablen
-
         this.websocketController = null;
         this.subscribeParameter = {};
         this.messageParseMutex = Promise.resolve();
@@ -40,7 +39,7 @@ class anycubic extends core.Adapter {
             this.log.warn('Please configure the Websocket connection!');
             return;
         }
-
+        this.energyId = this.config.energy_id || null;
         this.startWebsocket();
     }
 
@@ -59,8 +58,40 @@ class anycubic extends core.Adapter {
 
             this.websocketController.send(JSON.stringify({
                 jsonrpc: "2.0",
-                method:"printer.objects.list",
-                id: 100
+                method: "printer.objects.subscribe",
+                        params: {
+                            objects: {
+                                  "motion_report": null,
+                                  "configfile": null,
+                                  "heaters": null,
+                                  "respond": null,
+                                  "display_status": null,
+                                  "exclude_object": null,
+                                  "extruder": null,
+                                  "fan": null,
+                                  "heater_bed": null,
+                                  "mcu": null,
+                                  "mcu nozzle_mcu": null,
+                                  "ota_filament_hub": null,
+                                  "pause_resume": null,
+                                  "pause_resume/cancel": null,
+                                  "print_stats": null,
+                                  "toolhead": null,
+                                  "verify_heater extrude": null,
+                                  "verify_heater heater_bed": null,
+                                  "virtual_sdcard": null,
+                                  "webhooks": null,
+                                  "bed_mesh": null,
+                                  "bed_mesh default": null,
+                                  "bed_mesh \"default\"": null,
+                                  "idle_timeout": null,
+                                  "fan_generic air_filter_fan": null,
+                                  "fan_generic box_fan": null,
+                                  "mmu_machine": null,
+                                  "mmu": null,
+                                }
+                        },
+                id: 102
             }));
             this.setStateChanged('info.connection', true, true);
             this.setStateChanged('info.online', true, true);
@@ -83,91 +114,18 @@ class anycubic extends core.Adapter {
         this.messageParseMutex = lock;
         await prev;
 
+        let messageObj = JSON.parse(message);
+        this.log.debug(`--->>> fromAnycubic_RAW_1 -> ${JSON.stringify(messageObj)}`);
+        let request;
+        let shouldQuery = true;
+
         try {
-            let messageObj = JSON.parse(message);
-
-            this.log.debug(`--->>> fromAnycubic_RAW_1 -> ${JSON.stringify(messageObj)}`);
-
-            const method = messageObj?.method;
-
-            let request;
-
-            if (messageObj.id == 100) {
-                const param = await this.helper.removeGCodeObjects(messageObj.result.objects);
-                const obj = {};
-                for (const p of param) {
-                    obj[p] = null;
-                }
-                this.subscribeParameter = {objects: obj};
-
-                let shouldQuery = true;
-                if (this.config.energy_id) {
-                    try {
-                        const s = await this.getForeignStateAsync(this.config.energy_id);
-                        shouldQuery = s && s.val === true;
-                    } catch (e) {
-                        this.log.warn(`Could not read energy state ${this.config.energy_id}: ${e.message}`);
-                    }
-                }
-
-                if (shouldQuery) {
-                    this.websocketController.send(JSON.stringify({
-                        jsonrpc: "2.0",
-                        method: "printer.objects.query",
-                        params: {
-                            objects: {
-                                "*": null
-                            }
-                        },
-                        id: 102
-                    }));
-                }
-            }
-
-            if (messageObj.id == 102) {
-                if (!obj102_done) {
-                    const status = messageObj.result.status;
-
-                    for (const key of Object.keys(status)) {
-                        if (key !== '*') {
-                            if (!(key in this.subscribeParameter.objects)) {
-                                this.subscribeParameter.objects[key] = null;
-                            }
-                        }
-                    }
-
-                    // Only subscribe if energy state is true (or not configured)
-                    let shouldSubscribe = true;
-                    if (this.config.energy_id) {
-                        try {
-                            const s = await this.getForeignStateAsync(this.config.energy_id);
-                            shouldSubscribe = s && s.val === true;
-                        } catch (e) {
-                            this.log.warn(`Could not read energy state ${this.config.energy_id}: ${e.message}`);
-                        }
-                    }
-
-                    if (shouldSubscribe) {
-                        this.websocketController.send(JSON.stringify({
-                            jsonrpc: "2.0",
-                            method: "printer.objects.subscribe",
-                            params: this.subscribeParameter,
-                            id: 1
-                        }));
-                    }
-
-                    obj102_done = true;
-                }
-            }
-
             if (messageObj?.method) {
-                if (method === undefined ) {
-                    request = messageObj.result.status;
-                    await this.helper.parseStart(request, this.parseOptions);
-                } else {
-                    request = messageObj.params;
-                    await this.helper.parseMethod(request, this.parseOptions);
-                }
+                request = messageObj.params;
+                await this.helper.parseMethod(request, this.parseOptions);
+            } else if (messageObj?.result?.status) {
+                request = messageObj.result.status;
+                await this.helper.parseStart(request, this.parseOptions);
             }
 
         } catch (err) {
