@@ -130,26 +130,12 @@
       "native": {}
     },
     {
-      "_id": "info.finishTime",
-      "type": "state",
-      "common": {
-        "role": "text",
-        "name": "estimated finish time",
-        "desc": "Remaining time for current print job (HH:MM:SS format), empty when not printing",
-        "type": "string",
-        "read": true,
-        "write": false,
-        "def": "--:--:--"
-      },
-      "native": {}
-    },
-    {
       "_id": "info.totalTime",
       "type": "state",
       "common": {
         "role": "text",
-        "name": "estimated total print time",
-        "desc": "Estimated total duration of current print job (HH:MM:SS format)",
+        "name": "remaining print time",
+        "desc": "Remaining time of current print job (HH:MM:SS format), based on printer-estimated total minus elapsed time",
         "type": "string",
         "read": true,
         "write": false,

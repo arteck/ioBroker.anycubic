@@ -24,10 +24,9 @@ class anycubic extends core.Adapter {
 
         // Track print progress for finish time estimation
         this.printDuration = null;
-        this.printProgress = null;
-        this.lastFinishTime = null;
         this.lastPrintDuration = null;
         this.printState = null; // cached print_stats.state for incremental diff handling
+        this.estimatedTime = null; // cached estimated_time from job metadata
         this.lastTotalTime = null;
 
         // State write buffer: stores path -> { value, ack } for deferred writes
@@ -136,8 +135,16 @@ class anycubic extends core.Adapter {
         }
         const state = this.printState;
 
-        // Fix 1: Only calculate finish time when actively printing
+        // Only calculate remaining time when actively printing
         if (state === 'printing') {
+            // Extract and cache estimated_time from job metadata (printer provides this once after slicing)
+            const estimated = (data.job?.metadata && typeof data.job.metadata.estimated_time === 'number')
+                ? data.job.metadata.estimated_time
+                : null;
+            if (estimated != null) {
+                this.estimatedTime = estimated;
+            }
+
             // Extract print_duration from print_stats
             const pd = (data.print_stats && typeof data.print_stats.print_duration === 'number')
                 ? data.print_stats.print_duration
@@ -152,30 +159,13 @@ class anycubic extends core.Adapter {
                 this.printDuration = pd;
             }
 
-            // Extract progress from virtual_sdcard
-            if (data.virtual_sdcard && typeof data.virtual_sdcard.progress === 'number') {
-                this.printProgress = data.virtual_sdcard.progress;
-            }
-
-            // Calculate finish time when both values are available and progress > 0
-            if (this.printDuration != null && this.printProgress != null && this.printProgress > 0) {
-                const elapsed = this.printDuration;
-                const remaining = (elapsed / this.printProgress) - elapsed;
+            // Calculate remaining time: estimated_time - print_duration
+            if (this.estimatedTime != null && this.printDuration != null) {
+                const remaining = Math.max(0, this.estimatedTime - this.printDuration);
                 const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
                 const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
                 const seconds = String(Math.floor(remaining % 60)).padStart(2, '0');
-                const formattedTime = `${hours}:${minutes}:${seconds}`;
-                if (formattedTime !== this.lastFinishTime) {
-                    this._bufferStateChange('info.finishTime', formattedTime, true);
-                    this.lastFinishTime = formattedTime;
-                }
-
-                // Calculate total estimated print time
-                const totalEstimated = elapsed / this.printProgress;
-                const totalHours = String(Math.floor(totalEstimated / 3600)).padStart(2, '0');
-                const totalMinutes = String(Math.floor((totalEstimated % 3600) / 60)).padStart(2, '0');
-                const totalSeconds = String(Math.floor(totalEstimated % 60)).padStart(2, '0');
-                const formattedTotal = `${totalHours}:${totalMinutes}:${totalSeconds}`;
+                const formattedTotal = `${hours}:${minutes}:${seconds}`;
                 if (formattedTotal !== this.lastTotalTime) {
                     this._bufferStateChange('info.totalTime', formattedTotal, true);
                     this.lastTotalTime = formattedTotal;
@@ -185,22 +175,17 @@ class anycubic extends core.Adapter {
             // rawState is explicitly set to a non-printing value (complete,
             // cancelled, error, standby, paused).  Only act on explicit state
             // transitions — don't clear just because state is absent from a diff.
-            if (this.lastFinishTime !== '') {
-                this._bufferStateChange('info.finishTime', '', true);
-                this.lastFinishTime = '';
-            }
             if (this.lastTotalTime !== '') {
                 this._bufferStateChange('info.totalTime', '', true);
                 this.lastTotalTime = '';
             }
 
-            // Fix 2: Reset instance variables on print end states
+            // Reset instance variables on print end states
             if (rawState === 'complete' || rawState === 'cancelled' || rawState === 'error' || rawState === 'standby') {
                 this.printState = null;
                 this.printDuration = null;
-                this.printProgress = null;
-                this.lastFinishTime = null;
                 this.lastPrintDuration = null;
+                this.estimatedTime = null;
                 this.lastTotalTime = null;
             }
         }
