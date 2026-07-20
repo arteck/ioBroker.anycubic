@@ -57,6 +57,10 @@ class anycubic extends core.Adapter {
         }
         this.energyId = this.config.energy_id || null;
 
+        if (this.energyId) {
+            await this.subscribeForeignStatesAsync(this.energyId);
+        }
+
         // Prüfen ob energy_id konfiguriert ist und der Wert false ist
         if (this.energyId) {
             const energyState = await this.getStateAsync(this.energyId);
