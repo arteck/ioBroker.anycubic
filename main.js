@@ -254,12 +254,25 @@ class anycubic extends core.Adapter {
 
             if (result?.estimated_time != null) {
                 this.estimatedTime = result.estimated_time;
+                await this.setStateAsync('job.metadata.estimated_time', result.estimated_time, true);
                 this.log.debug(`estimated_time set to ${this.estimatedTime}s for "${filename}"`);
             }
 
             if (result?.thumbnails && Array.isArray(result.thumbnails)) {
-                await this.setStateAsync('info.thumbnails', JSON.stringify(result.thumbnails), true);
-                this.log.debug(`Thumbnails data written for "${filename}" (${result.thumbnails.length} entries)`);
+                for (let i = 0; i < result.thumbnails.length; i++) {
+                    const tn = result.thumbnails[i];
+                    await this.setStateAsync(`job.metadata.thumbnails.${i}.relative_path`, tn.relative_path ?? null, true);
+                    if (tn.size != null) {
+                        await this.setStateAsync(`job.metadata.thumbnails.${i}.size`, tn.size, true);
+                    }
+                    if (tn.width != null) {
+                        await this.setStateAsync(`job.metadata.thumbnails.${i}.width`, tn.width, true);
+                    }
+                    if (tn.height != null) {
+                        await this.setStateAsync(`job.metadata.thumbnails.${i}.height`, tn.height, true);
+                    }
+                }
+                this.log.debug(`Thumbnails data written to job.metadata for "${filename}" (${result.thumbnails.length} entries)`);
             }
         } catch (err) {
             if (err.name === 'AbortError' || err.name === 'TimeoutError') {
@@ -334,6 +347,7 @@ class anycubic extends core.Adapter {
                 extruder: null,
                 fan: null,
                 heater_bed: null,
+                job: null,
                 mcu: null,
                 print_stats: null,
                 "mcu nozzle_mcu": null,
