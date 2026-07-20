@@ -154,18 +154,26 @@
           "max": 100,
           "default": 5,
           "label": "waitForPong",
-          "description": "Anzahl fehlender Pongs bis Printer offline"
+          "description": "Number of missing pongs until the printer goes offline",
+          "xs": 12,
+          "sm": 6,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
         },
         "_btnQueryConfig": {
-          "type": "button",
+          "type": "sendTo",
+          "command": "queryConfig",
           "label": "Query Printer Config",
-          "send": "queryConfig",
-          "newLine": true,
+          "variant": "contained",
+          "color": "secondary",
+          "icon": "delete",
           "xs": 12,
-          "sm": 12,
-          "md": 6,
-          "lg": 4,
-          "xl": 4
+          "sm": 6,
+          "md": 4,
+          "lg": 3,
+          "xl": 3,
+          "newLine": true
         }
       }
     }

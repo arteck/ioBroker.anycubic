@@ -40,24 +40,11 @@ class anycubic extends core.Adapter {
             this.onStateChange(id, state).catch((e) => this.log.error(`onStateChange error: ${e}`));
         });
 
-        this.on('unload', this.onUnload.bind(this));
-
         this.on('message', (obj) => {
-            if (obj.command === 'queryConfig') {
-                if (this.websocketController) {
-                    const payload = JSON.stringify({
-                        jsonrpc: '2.0',
-                        method: 'printer.objects.query',
-                        params: { objects: { configfile: ['config', 'settings'] } },
-                        id: 110,
-                    });
-                    this.websocketController.send(payload);
-                    this.log.info('JSON-RPC queryConfig sent: printer.objects.query for configfile');
-                } else {
-                    this.log.warn('Cannot send queryConfig: websocket not connected');
-                }
-            }
+            this.onMessage(obj).catch((e) => this.log.error(`onMessage error: ${e}`));
         });
+
+        this.on('unload', this.onUnload.bind(this));
 
     }
 
@@ -94,6 +81,26 @@ class anycubic extends core.Adapter {
         this._flushInterval = setInterval(() => this._flushBuffer(), 15000);
     }
 
+    async onMessage(obj) {
+        if (!obj || !obj.command) {
+            return;
+        }
+
+        if (obj.command === 'queryConfig') {
+            if (this.websocketController) {
+                const payload = JSON.stringify({
+                    jsonrpc: '2.0',
+                    method: 'printer.objects.query',
+                    params: { objects: { configfile: ['config', 'settings'] } },
+                    id: 110,
+                });
+                this.websocketController.send(payload);
+                this.log.info('JSON-RPC queryConfig sent: printer.objects.query for configfile');
+            } else {
+                this.log.warn('Cannot send queryConfig: websocket not connected');
+            }
+        }
+    }
 
     async messageParse(message) {
         const lock = new Promise((resolve) => resolve());
@@ -103,6 +110,9 @@ class anycubic extends core.Adapter {
 
         let messageObj = JSON.parse(message);
         this.log.debug(`--->>> fromAnycubic_RAW_1 -> ${JSON.stringify(messageObj)}`);
+        if (messageObj?.id === 110) {
+            this.log.info(`Query Config Response: ${JSON.stringify(messageObj.result || messageObj)}`);
+        }
         let request;
         let shouldQuery = true;
 
