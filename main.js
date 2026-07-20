@@ -34,8 +34,7 @@ class anycubic extends core.Adapter {
     }
 
     async onReady() {
-        this.setStateChanged('info.connection', true, true);
-        this.setStateChanged('info.online', false, true);
+        this.setStateChanged('info.connection', false, true);
 
         // WebSocket-Verbindung
         if (!this.config.wsServerIP) {
@@ -49,7 +48,7 @@ class anycubic extends core.Adapter {
             const energyState = await this.getStateAsync(this.energyId);
             if (energyState && energyState.val === false) {
                 this.log.info('Energy is off - not starting WebSocket connection. Toggle energy to connect.');
-                this.setStateChanged('info.online', false, true);
+                this.setStateChanged('info.connection', false, true);
                 await this.command.createCommandStates();
                 return;
             }
@@ -99,7 +98,6 @@ class anycubic extends core.Adapter {
                 }
             }
             this.setStateChanged('info.connection', false, true);
-            this.setStateChanged('info.online', false, true);
         } finally {
             callback();
         }
@@ -148,16 +146,19 @@ class anycubic extends core.Adapter {
         }
 
         // If energy state changed to true, re-trigger subscription
-        if (this.config.energy_id && id === this.config.energy_id && state.val === true) {
+        if (this.energyId && id === this.energyId && state.val === true) {
             this.log.debug(`Energy state changed to true - (re)starting printer connection`);
             obj102_done = false;
 
             // Close existing connection first
             try {
-                this.websocketController.closeConnection();
+                if (this.websocketController) {
+                    this.websocketController.closeConnection();
+                }
             } catch (e) {
-                // ignore
+                this.log.debug(`Error closing websocket on energy true: ${e.message}`);
             }
+            this.setStateChanged('info.connection', false, true);
 
             const waitSeconds = parseInt(this.config.waitForPrinter) || 0;
             if (waitSeconds > 0) {
@@ -170,14 +171,14 @@ class anycubic extends core.Adapter {
         }
 
         // If energy state changed to false, close the websocket connection
-        if (this.config.energy_id && id === this.config.energy_id && state.val === false) {
+        if (this.energyId && id === this.energyId && state.val === false) {
             this.log.debug(`Energy state changed to false - closing websocket connection`);
             obj102_done = false;
+            this.setStateChanged('info.connection', false, true);
             try {
                 if (this.websocketController) {
                     this.websocketController.closeConnection();
                 }
-                this.setStateChanged('info.online', false, true);
             } catch (e) {
                 this.log.warn(`Error closing websocket: ${e.message}`);
             }
