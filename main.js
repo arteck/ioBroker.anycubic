@@ -117,17 +117,18 @@ class anycubic extends core.Adapter {
         let shouldQuery = true;
 
         try {
-            if (messageObj?.method) {
-                request = messageObj.params;
-                await this.helper.parseMethod(request, this.parseOptions);
-            } else if (messageObj?.result?.status) {
-                request = messageObj.result.status;
-                await this.helper.parseStart(request, this.parseOptions);
+            if (messageObj?.id === 102) {
+                if (messageObj?.method) {
+                    request = messageObj.params;
+                    await this.helper.parseMethod(request, this.parseOptions);
+                } else if (messageObj?.result?.status) {
+                    request = messageObj.result.status;
+                    await this.helper.parseStart(request, this.parseOptions);
+                }
+
+                // Track print progress data and calculate finish time
+                this._updateFinishTime(messageObj);
             }
-
-            // Track print progress data and calculate finish time
-            this._updateFinishTime(messageObj);
-
         } catch (err) {
             this.log.error(err);
             this.log.error(`<anycubic> error message -->> ${message}`);

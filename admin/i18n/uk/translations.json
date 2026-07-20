@@ -13,5 +13,9 @@
 	"Object ID external state": "ID об'єкта зовнішнього стану",
 	"Datapoint of the external state": "Точка даних зовнішнього стану",
 	"wait x sec. after state is on": "зачекайте x сек. після увімкнення стану",
-	"wait x sec": "зачекайте x сек"
+	"wait x sec": "зачекайте x сек",
+	"devices": "Пристрої",
+	"waitForPong": "waitForPong",
+	"Number of missing pongs until the printer goes offline": "Кількість пропущених pong до відключення принтера",
+	"Query Printer Config": "Запитати конфігурацію принтера"
 }

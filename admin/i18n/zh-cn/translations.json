@@ -13,5 +13,9 @@
 	"Object ID external state": "外部状态的对象 ID",
 	"Datapoint of the external state": "外部状态的数据点",
 	"wait x sec. after state is on": "状态开启后等待 x 秒",
-	"wait x sec": "等待 x 秒"
+	"wait x sec": "等待 x 秒",
+	"devices": "设备",
+	"waitForPong": "waitForPong",
+	"Number of missing pongs until the printer goes offline": "打印机离线前缺失的 pong 数量",
+	"Query Printer Config": "查询打印机配置"
 }

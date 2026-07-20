@@ -13,5 +13,9 @@
 	"Object ID external state": "Object ID external state",
 	"Datapoint of the external state": "Datapoint of the external state",
 	"wait x sec. after state is on": "wait x sec. after state is on",
-	"wait x sec": "wait x sec"
+	"wait x sec": "wait x sec",
+	"devices": "Devices",
+	"waitForPong": "waitForPong",
+	"Number of missing pongs until the printer goes offline": "Number of missing pongs until the printer goes offline",
+	"Query Printer Config": "Query Printer Config"
 }

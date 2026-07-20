@@ -13,5 +13,9 @@
 	"Object ID external state": "ID d'objet de l'état externe",
 	"Datapoint of the external state": "Point de données de l'état externe",
 	"wait x sec. after state is on": "attendre x s après que l'état soit allumé",
-	"wait x sec": "attendre x s"
+	"wait x sec": "attendre x s",
+	"devices": "Appareils",
+	"waitForPong": "waitForPong",
+	"Number of missing pongs until the printer goes offline": "Nombre de pongs manquants avant que l'imprimante ne se déconnecte",
+	"Query Printer Config": "Interroger la configuration de l'imprimante"
 }

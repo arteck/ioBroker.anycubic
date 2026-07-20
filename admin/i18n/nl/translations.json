@@ -13,5 +13,9 @@
 	"Object ID external state": "Object-ID externe status",
 	"Datapoint of the external state": "Datapunt van de externe status",
 	"wait x sec. after state is on": "wacht x sec. nadat status aan is",
-	"wait x sec": "wacht x sec"
+	"wait x sec": "wacht x sec",
+	"devices": "Apparaten",
+	"waitForPong": "waitForPong",
+	"Number of missing pongs until the printer goes offline": "Aantal gemiste pongs voordat de printer offline gaat",
+	"Query Printer Config": "Printerconfiguratie opvragen"
 }
