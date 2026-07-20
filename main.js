@@ -25,6 +25,12 @@ class anycubic extends core.Adapter {
         // Track print progress for finish time estimation
         this.printDuration = null;
         this.printProgress = null;
+        this.lastFinishTime = null;
+        this.lastPrintDuration = null;
+
+        // State write buffer: stores path -> { value, ack } for deferred writes
+        this._stateBuffer = new Map();
+        this._flushInterval = null;
 
         this.on('ready', () => {
             this.onReady().catch((e) => this.log.error(`onReady error: ${e}`));
@@ -39,6 +45,9 @@ class anycubic extends core.Adapter {
 
     async onReady() {
         this.setStateChanged('info.connection', false, true);
+
+        // Expose buffer method to helper so all dynamic states go through the buffer
+        this._bufferStateChange = this._bufferStateChange.bind(this);
 
         // WebSocket-Verbindung
         if (!this.config.wsServerIP) {
@@ -62,6 +71,9 @@ class anycubic extends core.Adapter {
 
         // Command-States anlegen
         await this.command.createCommandStates();
+
+        // Start the 15-second state write buffer flush interval
+        this._flushInterval = setInterval(() => this._flushBuffer(), 15000);
     }
 
 
@@ -117,8 +129,17 @@ class anycubic extends core.Adapter {
         // Fix 1: Only calculate finish time when actively printing
         if (state === 'printing') {
             // Extract print_duration from print_stats
-            if (data.print_stats && typeof data.print_stats.print_duration === 'number') {
-                this.printDuration = data.print_stats.print_duration;
+            const pd = (data.print_stats && typeof data.print_stats.print_duration === 'number')
+                ? data.print_stats.print_duration
+                : null;
+
+            // Only recalculate when print_duration actually ticks forward
+            if (pd === this.lastPrintDuration) {
+                return;
+            }
+            this.lastPrintDuration = pd;
+            if (pd != null) {
+                this.printDuration = pd;
             }
 
             // Extract progress from virtual_sdcard
@@ -133,22 +154,64 @@ class anycubic extends core.Adapter {
                 const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
                 const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
                 const formattedTime = `${hours}:${minutes}`;
-                this.setState('info.finishTime', formattedTime, true);
+                if (formattedTime !== this.lastFinishTime) {
+                    this._bufferStateChange('info.finishTime', formattedTime, true);
+                    this.lastFinishTime = formattedTime;
+                }
             }
         } else {
             // Fix 1: Not printing, clear finish time
-            this.setState('info.finishTime', '', true);
+            if (this.lastFinishTime !== '') {
+                this._bufferStateChange('info.finishTime', '', true);
+                this.lastFinishTime = '';
+            }
 
             // Fix 2: Reset instance variables on print end states
             if (state === 'complete' || state === 'cancelled' || state === 'error' || state === 'standby') {
                 this.printDuration = null;
                 this.printProgress = null;
+                this.lastFinishTime = null;
+                this.lastPrintDuration = null;
             }
         }
     }
 
+    /**
+     * Buffers a state change for deferred write (15-second flush interval).
+     * Only the latest value per path is kept — previous writes are overwritten.
+     *
+     * @param {string} path - The ioBroker state path.
+     * @param {*} value - The value to write.
+     * @param {boolean} [ack=true] - Acknowledged flag.
+     */
+    _bufferStateChange(path, value, ack = true) {
+        this._stateBuffer.set(path, { value, ack });
+    }
+
+    /**
+     * Flushes all buffered state changes to ioBroker immediately.
+     */
+    _flushBuffer() {
+        if (this._stateBuffer.size === 0) {
+            return;
+        }
+        const count = this._stateBuffer.size;
+        for (const [path, { value, ack }] of this._stateBuffer) {
+            this.setStateChanged(path, value, ack);
+        }
+        this._stateBuffer.clear();
+        this.log.debug(`_flushBuffer: flushed ${count} state(s)`);
+    }
+
     async onUnload(callback) {
         try {
+            // Clear flush interval and flush any remaining buffered states
+            if (this._flushInterval) {
+                clearInterval(this._flushInterval);
+                this._flushInterval = null;
+            }
+            this._flushBuffer();
+
             if (this.websocketController) {
                 try {
                     await this.websocketController.allTimerClear();
@@ -157,6 +220,7 @@ class anycubic extends core.Adapter {
                     this.log.error(e);
                 }
             }
+            // info.connection must NOT go through buffer — write immediately
             this.setStateChanged('info.connection', false, true);
         } finally {
             callback();
