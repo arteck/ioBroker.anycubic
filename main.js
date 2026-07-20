@@ -197,7 +197,7 @@ class anycubic extends core.Adapter {
      *
      * @param {string} path - The ioBroker state path.
      * @param {*} value - The value to write.
-     * @param {boolean} [ack=true] - Acknowledged flag.
+     * @param {boolean} [ack] - Acknowledged flag.
      */
     _bufferStateChange(path, value, ack = true) {
         this._stateBuffer.set(path, { value, ack });
@@ -247,32 +247,32 @@ class anycubic extends core.Adapter {
         this.websocketController.start(
             {
             //    "motion_report": null,
-                "configfile": null,
-                "heaters": null,
+                configfile: null,
+                heaters: null,
             //    "respond": null,
            //     "display_status": null,
-                "exclude_object": null,
-                "extruder": null,
-                "fan": null,
-                "heater_bed": null,
-                "mcu": null,
+                exclude_object: null,
+                extruder: null,
+                fan: null,
+                heater_bed: null,
+                mcu: null,
                 "mcu nozzle_mcu": null,
-                "ota_filament_hub": null,
-                "pause_resume": null,
+                ota_filament_hub: null,
+                pause_resume: null,
                 "pause_resume/cancel": null,
-                "print_stats": null,
-                "toolhead": null,
+                print_stats: null,
+                toolhead: null,
             //    "verify_heater extrude": null,
                 "verify_heater heater_bed": null,
-                "virtual_sdcard": null,
-                "webhooks": null,
+                virtual_sdcard: null,
+                webhooks: null,
             //    "bed_mesh": null,
             //    "bed_mesh default": null,
-                "idle_timeout": null,
+                idle_timeout: null,
                 "fan_generic air_filter_fan": null,
                 "fan_generic box_fan": null,
-                "mmu_machine": null,
-                "mmu": null,
+                mmu_machine: null,
+                mmu: null,
             },
             (message) => this.messageParse(message),
             allowRetry
