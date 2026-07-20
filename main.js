@@ -27,6 +27,7 @@ class anycubic extends core.Adapter {
         this.printProgress = null;
         this.lastFinishTime = null;
         this.lastPrintDuration = null;
+        this.printState = null; // cached print_stats.state for incremental diff handling
 
         // State write buffer: stores path -> { value, ack } for deferred writes
         this._stateBuffer = new Map();
@@ -124,7 +125,15 @@ class anycubic extends core.Adapter {
             return;
         }
 
-        const state = data.print_stats?.state;
+        // Moonraker's notify_status_update sends INCREMENTAL diffs — only changed
+        // fields are present.  "state" stays "printing" for the entire job so it
+        // is typically absent after the very first update.  Cache the real state
+        // so later diffs continue to treat the printer as "printing".
+        const rawState = data.print_stats?.state;
+        if (rawState === 'printing') {
+            this.printState = rawState;
+        }
+        const state = this.printState;
 
         // Fix 1: Only calculate finish time when actively printing
         if (state === 'printing') {
@@ -159,15 +168,18 @@ class anycubic extends core.Adapter {
                     this.lastFinishTime = formattedTime;
                 }
             }
-        } else {
-            // Fix 1: Not printing, clear finish time
+        } else if (rawState !== undefined) {
+            // rawState is explicitly set to a non-printing value (complete,
+            // cancelled, error, standby, paused).  Only act on explicit state
+            // transitions — don't clear just because state is absent from a diff.
             if (this.lastFinishTime !== '') {
                 this._bufferStateChange('info.finishTime', '', true);
                 this.lastFinishTime = '';
             }
 
             // Fix 2: Reset instance variables on print end states
-            if (state === 'complete' || state === 'cancelled' || state === 'error' || state === 'standby') {
+            if (rawState === 'complete' || rawState === 'cancelled' || rawState === 'error' || rawState === 'standby') {
+                this.printState = null;
                 this.printDuration = null;
                 this.printProgress = null;
                 this.lastFinishTime = null;
