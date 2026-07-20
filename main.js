@@ -254,6 +254,10 @@ class anycubic extends core.Adapter {
 
             if (result?.estimated_time != null) {
                 this.estimatedTime = result.estimated_time;
+                await this.setObjectNotExistsAsync('job.metadata.estimated_time', {
+                    type: 'state',
+                    common: { name: 'Estimated print time', type: 'number', role: 'value', unit: 's', read: true, write: false, def: 0 },
+                });
                 await this.setStateAsync('job.metadata.estimated_time', result.estimated_time, true);
                 this.log.debug(`estimated_time set to ${this.estimatedTime}s for "${filename}"`);
             }
@@ -261,14 +265,32 @@ class anycubic extends core.Adapter {
             if (result?.thumbnails && Array.isArray(result.thumbnails)) {
                 for (let i = 0; i < result.thumbnails.length; i++) {
                     const tn = result.thumbnails[i];
+
+                    await this.setObjectNotExistsAsync(`job.metadata.thumbnails.${i}.relative_path`, {
+                        type: 'state',
+                        common: { name: `Thumbnail ${i} path`, type: 'string', role: 'text', read: true, write: false, def: '' },
+                    });
                     await this.setStateAsync(`job.metadata.thumbnails.${i}.relative_path`, tn.relative_path ?? null, true);
+
                     if (tn.size != null) {
+                        await this.setObjectNotExistsAsync(`job.metadata.thumbnails.${i}.size`, {
+                            type: 'state',
+                            common: { name: `Thumbnail ${i} size`, type: 'number', role: 'value', unit: 'bytes', read: true, write: false, def: 0 },
+                        });
                         await this.setStateAsync(`job.metadata.thumbnails.${i}.size`, tn.size, true);
                     }
                     if (tn.width != null) {
+                        await this.setObjectNotExistsAsync(`job.metadata.thumbnails.${i}.width`, {
+                            type: 'state',
+                            common: { name: `Thumbnail ${i} width`, type: 'number', role: 'value', unit: 'px', read: true, write: false, def: 0 },
+                        });
                         await this.setStateAsync(`job.metadata.thumbnails.${i}.width`, tn.width, true);
                     }
                     if (tn.height != null) {
+                        await this.setObjectNotExistsAsync(`job.metadata.thumbnails.${i}.height`, {
+                            type: 'state',
+                            common: { name: `Thumbnail ${i} height`, type: 'number', role: 'value', unit: 'px', read: true, write: false, def: 0 },
+                        });
                         await this.setStateAsync(`job.metadata.thumbnails.${i}.height`, tn.height, true);
                     }
                 }
