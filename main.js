@@ -110,14 +110,11 @@ class anycubic extends core.Adapter {
 
         let messageObj = JSON.parse(message);
         this.log.debug(`--->>> fromAnycubic_RAW_1 -> ${JSON.stringify(messageObj)}`);
-        if (messageObj?.id === 110) {
-            this.log.info(`Query Config Response: ${JSON.stringify(messageObj.result || messageObj)}`);
-        }
+
         let request;
         let shouldQuery = true;
 
         try {
-            if (messageObj?.id === 102) {
                 if (messageObj?.method) {
                     request = messageObj.params;
                     await this.helper.parseMethod(request, this.parseOptions);
@@ -128,7 +125,6 @@ class anycubic extends core.Adapter {
 
                 // Track print progress data and calculate finish time
                 this._updateFinishTime(messageObj);
-            }
         } catch (err) {
             this.log.error(err);
             this.log.error(`<anycubic> error message -->> ${message}`);
