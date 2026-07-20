@@ -159,20 +159,6 @@
           "md": 6,
           "lg": 6,
           "xl": 6
-        },
-        "_btnQueryConfig": {
-          "type": "sendTo",
-          "command": "queryConfig",
-          "label": "Query Printer Config",
-          "variant": "contained",
-          "color": "secondary",
-          "icon": "delete",
-          "xs": 12,
-          "sm": 6,
-          "md": 4,
-          "lg": 3,
-          "xl": 3,
-          "newLine": true
         }
       }
     }

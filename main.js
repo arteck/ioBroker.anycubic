@@ -41,12 +41,7 @@ class anycubic extends core.Adapter {
             this.onStateChange(id, state).catch((e) => this.log.error(`onStateChange error: ${e}`));
         });
 
-        this.on('message', (obj) => {
-            this.onMessage(obj).catch((e) => this.log.error(`onMessage error: ${e}`));
-        });
-
         this.on('unload', this.onUnload.bind(this));
-
     }
 
     async onReady() {
@@ -80,27 +75,6 @@ class anycubic extends core.Adapter {
 
         // Start the 15-second state write buffer flush interval
         this._flushInterval = setInterval(() => this._flushBuffer(), 15000);
-    }
-
-    async onMessage(obj) {
-        if (!obj || !obj.command) {
-            return;
-        }
-
-        if (obj.command === 'queryConfig') {
-            if (this.websocketController) {
-                const payload = JSON.stringify({
-                    jsonrpc: '2.0',
-                    method: 'printer.objects.query',
-                    params: { objects: { configfile: ['config', 'settings'] } },
-                    id: 110,
-                });
-                this.websocketController.send(payload);
-                this.log.info('JSON-RPC queryConfig sent: printer.objects.query for configfile');
-            } else {
-                this.log.warn('Cannot send queryConfig: websocket not connected');
-            }
-        }
     }
 
     async messageParse(message) {
