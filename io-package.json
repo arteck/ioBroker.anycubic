@@ -135,11 +135,11 @@
       "common": {
         "role": "text",
         "name": "estimated finish time",
-        "desc": "Remaining time for current print job (HH:MM format), empty when not printing",
+        "desc": "Remaining time for current print job (HH:MM:SS format), empty when not printing",
         "type": "string",
         "read": true,
         "write": false,
-        "def": ""
+        "def": "--:--:--"
       },
       "native": {}
     }

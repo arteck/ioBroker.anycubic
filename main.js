@@ -162,7 +162,8 @@ class anycubic extends core.Adapter {
                 const remaining = (elapsed / this.printProgress) - elapsed;
                 const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
                 const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
-                const formattedTime = `${hours}:${minutes}`;
+                const seconds = String(Math.floor(remaining % 60)).padStart(2, '0');
+                const formattedTime = `${hours}:${minutes}:${seconds}`;
                 if (formattedTime !== this.lastFinishTime) {
                     this._bufferStateChange('info.finishTime', formattedTime, true);
                     this.lastFinishTime = formattedTime;
