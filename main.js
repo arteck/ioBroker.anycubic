@@ -28,6 +28,7 @@ class anycubic extends core.Adapter {
         this.printState = null; // cached print_stats.state for incremental diff handling
         this.estimatedTime = null; // cached estimated_time from job metadata
         this.lastTotalTime = null;
+        this.lastFilename = null; // track filename changes for metadata fetch
 
         // State write buffer: stores path -> { value, ack } for deferred writes
         this._stateBuffer = new Map();
@@ -155,6 +156,16 @@ class anycubic extends core.Adapter {
         // so later diffs continue to treat the printer as "printing".
         const rawState = data.print_stats?.state;
         if (rawState === 'printing') {
+
+            // Detect filename changes and fetch metadata
+            const currentFilename = data.print_stats?.filename;
+            if (currentFilename && currentFilename !== this.lastFilename) {
+                this.lastFilename = currentFilename;
+                this._fetchFileMetadata(currentFilename).catch(e =>
+                    this.log.warn(`Failed to fetch file metadata: ${e.message}`)
+                );
+            }
+
             this.printState = rawState;
         }
         const state = this.printState;
@@ -211,6 +222,50 @@ class anycubic extends core.Adapter {
                 this.lastPrintDuration = null;
                 this.estimatedTime = null;
                 this.lastTotalTime = null;
+            }
+        }
+    }
+
+    /**
+     * Fetches file metadata from the printer's HTTP API.
+     * Extracts estimated_time for finish-time calculation and thumbnail data.
+     * @param {string} filename - The filename to fetch metadata for.
+     */
+    async _fetchFileMetadata(filename) {
+        const ip = this.config.webUIServer;
+        const port = this.config.webUIPort || 4409;
+
+        if (!ip) {
+            this.log.debug('webUIServer not configured – skipping metadata fetch');
+            return;
+        }
+
+        const url = `http://${ip}:${port}/server/files/metadata?filename=${encodeURIComponent(filename)}`;
+        this.log.debug(`Fetching file metadata: ${url}`);
+
+        try {
+            const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const json = await response.json();
+            const result = json?.result;
+
+            if (result?.estimated_time != null) {
+                this.estimatedTime = result.estimated_time;
+                this.log.debug(`estimated_time set to ${this.estimatedTime}s for "${filename}"`);
+            }
+
+            if (result?.thumbnails && Array.isArray(result.thumbnails)) {
+                await this.setStateAsync('info.thumbnails', JSON.stringify(result.thumbnails), true);
+                this.log.debug(`Thumbnails data written for "${filename}" (${result.thumbnails.length} entries)`);
+            }
+        } catch (err) {
+            if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+                this.log.warn(`Metadata fetch timed out for "${filename}"`);
+            } else {
+                this.log.warn(`Metadata fetch error for "${filename}": ${err.message}`);
             }
         }
     }
@@ -280,11 +335,11 @@ class anycubic extends core.Adapter {
                 fan: null,
                 heater_bed: null,
                 mcu: null,
+                print_stats: null,
                 "mcu nozzle_mcu": null,
                 ota_filament_hub: null,
                 pause_resume: null,
                 "pause_resume/cancel": null,
-                print_stats: null,
                 toolhead: null,
             //    "verify_heater extrude": null,
                 "verify_heater heater_bed": null,
