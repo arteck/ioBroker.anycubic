@@ -42,6 +42,23 @@ class anycubic extends core.Adapter {
 
         this.on('unload', this.onUnload.bind(this));
 
+        this.on('message', (obj) => {
+            if (obj.command === 'queryConfig') {
+                if (this.websocketController) {
+                    const payload = JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'printer.objects.query',
+                        params: { objects: { configfile: ['config', 'settings'] } },
+                        id: 110,
+                    });
+                    this.websocketController.send(payload);
+                    this.log.info('JSON-RPC queryConfig sent: printer.objects.query for configfile');
+                } else {
+                    this.log.warn('Cannot send queryConfig: websocket not connected');
+                }
+            }
+        });
+
     }
 
     async onReady() {

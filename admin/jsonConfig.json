@@ -155,6 +155,17 @@
           "default": 5,
           "label": "waitForPong",
           "description": "Anzahl fehlender Pongs bis Printer offline"
+        },
+        "_btnQueryConfig": {
+          "type": "button",
+          "label": "Query Printer Config",
+          "send": "queryConfig",
+          "newLine": true,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 4,
+          "xl": 4
         }
       }
     }
