@@ -28,6 +28,7 @@ class anycubic extends core.Adapter {
         this.lastFinishTime = null;
         this.lastPrintDuration = null;
         this.printState = null; // cached print_stats.state for incremental diff handling
+        this.lastTotalTime = null;
 
         // State write buffer: stores path -> { value, ack } for deferred writes
         this._stateBuffer = new Map();
@@ -168,6 +169,17 @@ class anycubic extends core.Adapter {
                     this._bufferStateChange('info.finishTime', formattedTime, true);
                     this.lastFinishTime = formattedTime;
                 }
+
+                // Calculate total estimated print time
+                const totalEstimated = elapsed / this.printProgress;
+                const totalHours = String(Math.floor(totalEstimated / 3600)).padStart(2, '0');
+                const totalMinutes = String(Math.floor((totalEstimated % 3600) / 60)).padStart(2, '0');
+                const totalSeconds = String(Math.floor(totalEstimated % 60)).padStart(2, '0');
+                const formattedTotal = `${totalHours}:${totalMinutes}:${totalSeconds}`;
+                if (formattedTotal !== this.lastTotalTime) {
+                    this._bufferStateChange('info.totalTime', formattedTotal, true);
+                    this.lastTotalTime = formattedTotal;
+                }
             }
         } else if (rawState !== undefined) {
             // rawState is explicitly set to a non-printing value (complete,
@@ -177,6 +189,10 @@ class anycubic extends core.Adapter {
                 this._bufferStateChange('info.finishTime', '', true);
                 this.lastFinishTime = '';
             }
+            if (this.lastTotalTime !== '') {
+                this._bufferStateChange('info.totalTime', '', true);
+                this.lastTotalTime = '';
+            }
 
             // Fix 2: Reset instance variables on print end states
             if (rawState === 'complete' || rawState === 'cancelled' || rawState === 'error' || rawState === 'standby') {
@@ -185,6 +201,7 @@ class anycubic extends core.Adapter {
                 this.printProgress = null;
                 this.lastFinishTime = null;
                 this.lastPrintDuration = null;
+                this.lastTotalTime = null;
             }
         }
     }

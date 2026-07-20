@@ -142,6 +142,20 @@
         "def": "--:--:--"
       },
       "native": {}
+    },
+    {
+      "_id": "info.totalTime",
+      "type": "state",
+      "common": {
+        "role": "text",
+        "name": "estimated total print time",
+        "desc": "Estimated total duration of current print job (HH:MM:SS format)",
+        "type": "string",
+        "read": true,
+        "write": false,
+        "def": "--:--:--"
+      },
+      "native": {}
     }
   ]
 }
