@@ -128,6 +128,20 @@
         "def": false
       },
       "native": {}
+    },
+    {
+      "_id": "info.finishTime",
+      "type": "state",
+      "common": {
+        "role": "text",
+        "name": "estimated finish time",
+        "desc": "Remaining time for current print job (HH:MM format), empty when not printing",
+        "type": "string",
+        "read": true,
+        "write": false,
+        "def": ""
+      },
+      "native": {}
     }
   ]
 }

@@ -22,6 +22,10 @@ class anycubic extends core.Adapter {
         this.helper = new Helper(this);
         this.command = new Command(this);
 
+        // Track print progress for finish time estimation
+        this.printDuration = null;
+        this.printProgress = null;
+
         this.on('ready', () => {
             this.onReady().catch((e) => this.log.error(`onReady error: ${e}`));
         });
@@ -81,9 +85,65 @@ class anycubic extends core.Adapter {
                 await this.helper.parseStart(request, this.parseOptions);
             }
 
+            // Track print progress data and calculate finish time
+            this._updateFinishTime(messageObj);
+
         } catch (err) {
             this.log.error(err);
             this.log.error(`<anycubic> error message -->> ${message}`);
+        }
+    }
+
+    _updateFinishTime(messageObj) {
+        // Fix 3: Only process notify_status_update messages (carries printer status data)
+        if (messageObj?.method !== 'notify_status_update') {
+            return;
+        }
+
+        const params = messageObj.params;
+        let data;
+        if (Array.isArray(params)) {
+            data = params[0];
+        } else {
+            data = params;
+        }
+
+        if (!data || typeof data !== 'object') {
+            return;
+        }
+
+        const state = data.print_stats?.state;
+
+        // Fix 1: Only calculate finish time when actively printing
+        if (state === 'printing') {
+            // Extract print_duration from print_stats
+            if (data.print_stats && typeof data.print_stats.print_duration === 'number') {
+                this.printDuration = data.print_stats.print_duration;
+            }
+
+            // Extract progress from virtual_sdcard
+            if (data.virtual_sdcard && typeof data.virtual_sdcard.progress === 'number') {
+                this.printProgress = data.virtual_sdcard.progress;
+            }
+
+            // Calculate finish time when both values are available and progress > 0
+            if (this.printDuration != null && this.printProgress != null && this.printProgress > 0) {
+                const elapsed = this.printDuration;
+                const remaining = (elapsed / this.printProgress) - elapsed;
+                const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
+                const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
+                const formattedTime = `${hours}:${minutes}`;
+                this.setState('info.finishTime', formattedTime, true);
+            }
+        } else {
+            // Fix 1: Not printing, clear finish time
+            this.setState('info.finishTime', '', true);
+
+            // Fix 2: Reset instance variables on print end states
+            if (state === 'complete' || state === 'cancelled' || state === 'error' || state === 'standby') {
+                this.printDuration = null;
+                this.printProgress = null;
+            }
         }
     }
 
