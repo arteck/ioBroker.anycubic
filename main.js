@@ -56,6 +56,7 @@ class anycubic extends core.Adapter {
             return;
         }
         this.energyId = this.config.energy_id || null;
+        this.setStateChanged('info.waitForPrinter', parseInt(this.config.waitForPrinter) || 0, true);
 
         if (this.energyId) {
             await this.subscribeForeignStatesAsync(this.energyId);
@@ -317,6 +318,13 @@ class anycubic extends core.Adapter {
                 clearInterval(this._flushInterval);
                 this._flushInterval = null;
             }
+
+            // Clear countdown interval if active
+            if (this._waitPrinterInterval) {
+                clearInterval(this._waitPrinterInterval);
+                this._waitPrinterInterval = null;
+            }
+
             this._flushBuffer();
 
             if (this.websocketController) {
@@ -392,11 +400,42 @@ class anycubic extends core.Adapter {
             }
             this.setStateChanged('info.connection', false, true);
 
+            // Clear any existing countdown interval
+            if (this._waitPrinterInterval) {
+                clearInterval(this._waitPrinterInterval);
+                this._waitPrinterInterval = null;
+            }
+
             const waitSeconds = parseInt(this.config.waitForPrinter) || 0;
+
+            // Start countdown: set initial value and start decrement interval
+            let countdownRemaining = waitSeconds;
+            this.setStateChanged('info.waitForPrinter', countdownRemaining, true);
+
+            if (countdownRemaining > 0) {
+                this._waitPrinterInterval = setInterval(() => {
+                    countdownRemaining--;
+                    if (countdownRemaining <= 0) {
+                        clearInterval(this._waitPrinterInterval);
+                        this._waitPrinterInterval = null;
+                        this.setStateChanged('info.waitForPrinter', 0, true);
+                    } else {
+                        this.setStateChanged('info.waitForPrinter', countdownRemaining, true);
+                    }
+                }, 1000);
+            }
+
             if (waitSeconds > 0) {
                 this.log.debug(`Waiting ${waitSeconds}s for printer to boot up...`);
                 await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
             }
+
+            // Ensure countdown is cleared after the wait completes
+            if (this._waitPrinterInterval) {
+                clearInterval(this._waitPrinterInterval);
+                this._waitPrinterInterval = null;
+            }
+            this.setStateChanged('info.waitForPrinter', 0, true);
 
             this.startWebsocket(true);
             return;
@@ -407,6 +446,15 @@ class anycubic extends core.Adapter {
             this.log.debug(`Energy state changed to false - closing websocket connection`);
             obj102_done = false;
             this.setStateChanged('info.connection', false, true);
+
+            // Clear any existing countdown interval
+            if (this._waitPrinterInterval) {
+                clearInterval(this._waitPrinterInterval);
+                this._waitPrinterInterval = null;
+            }
+            // Reset countdown state to configured value
+            this.setStateChanged('info.waitForPrinter', parseInt(this.config.waitForPrinter) || 0, true);
+
             try {
                 if (this.websocketController) {
                     this.websocketController.closeConnection();

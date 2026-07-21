@@ -142,6 +142,20 @@
         "def": "--:--:--"
       },
       "native": {}
+    },
+    {
+      "_id": "info.waitForPrinter",
+      "type": "state",
+      "common": {
+        "role": "value",
+        "name": "Wait for printer countdown",
+        "desc": "Countdown in seconds until printer connection attempt",
+        "type": "number",
+        "read": true,
+        "write": false,
+        "def": 0
+      },
+      "native": {}
     }
   ]
 }
