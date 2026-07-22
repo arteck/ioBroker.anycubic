@@ -15,6 +15,7 @@
 
 ## Anycubic adapter for ioBroker
 
+you nedd the [rinkahals](https://github.com/rinkhals-community/Rinkhals/) addon on your Printer
 
 ## Changelog
 
