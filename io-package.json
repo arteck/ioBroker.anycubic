@@ -169,6 +169,19 @@
         "write": true
       },
       "native": {}
+    },
+    {
+      "_id": "info.dataError",
+      "type": "state",
+      "common": {
+        "name": "Last data error",
+        "role": "text",
+        "def": "",
+        "type": "string",
+        "read": true,
+        "write": false
+      },
+      "native": {}
     }
   ]
 }

@@ -35,10 +35,16 @@ class anycubic extends core.Adapter {
         this._flushInterval = null;
 
         this.on('ready', () => {
-            this.onReady().catch((e) => this.log.error(`onReady error: ${e}`));
+            this.onReady().catch((e) => {
+                this.log.error(`onReady error: ${e}`);
+                this.setStateChanged('info.dataError', e.message, true);
+            });
         });
         this.on('stateChange', (id, state) => {
-            this.onStateChange(id, state).catch((e) => this.log.error(`onStateChange error: ${e}`));
+            this.onStateChange(id, state).catch((e) => {
+                this.log.error(`onStateChange error: ${e}`);
+                this.setStateChanged('info.dataError', e.message, true);
+            });
         });
 
         this.on('unload', this.onUnload.bind(this));
@@ -108,6 +114,7 @@ class anycubic extends core.Adapter {
         } catch (err) {
             this.log.error(err);
             this.log.error(`<anycubic> error message -->> ${message}`);
+            this.setStateChanged('info.dataError', err.message || String(err), true);
         }
     }
 
@@ -275,12 +282,16 @@ class anycubic extends core.Adapter {
                 }
                 this.log.debug(`Thumbnails data written to job.metadata for "${filename}" (${result.thumbnails.length} entries)`);
             }
+
+            // Clear data error on successful fetch
+            this.setStateChanged('info.dataError', '', true);
         } catch (err) {
             if (err.name === 'AbortError' || err.name === 'TimeoutError') {
                 this.log.warn(`Metadata fetch timed out for "${filename}"`);
             } else {
                 this.log.warn(`Metadata fetch error for "${filename}": ${err.message}`);
             }
+            this.setStateChanged('info.dataError', err.message, true);
         }
     }
 
@@ -339,6 +350,7 @@ class anycubic extends core.Adapter {
                     this.websocketController.closeConnection();
                 } catch (e) {
                     this.log.error(e);
+                    this.setStateChanged('info.dataError', e.message || String(e), true);
                 }
             }
             // info.connection must NOT go through buffer — write immediately
