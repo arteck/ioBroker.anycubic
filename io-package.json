@@ -156,6 +156,19 @@
         "def": 0
       },
       "native": {}
+    },
+    {
+      "_id": "info.getInfo",
+      "type": "state",
+      "common": {
+        "name": "Manual refresh",
+        "role": "button",
+        "def": false,
+        "type": "boolean",
+        "read": true,
+        "write": true
+      },
+      "native": {}
     }
   ]
 }

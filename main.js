@@ -325,6 +325,12 @@ class anycubic extends core.Adapter {
                 this._waitPrinterInterval = null;
             }
 
+            // Clear getInfo timeout if active
+            if (this._getInfoTimeout) {
+                this.clearTimeout(this._getInfoTimeout);
+                this._getInfoTimeout = null;
+            }
+
             this._flushBuffer();
 
             if (this.websocketController) {
@@ -467,6 +473,33 @@ class anycubic extends core.Adapter {
 
         // === Command States ausführen (ausgelagert in command.js) ===
         if (await this.command.handleCommand(id, state)) {
+            return;
+        }
+
+        // === Manual refresh button (info.getInfo) ===
+        if (id === `${this.namespace}.info.getInfo` && state.val === true) {
+            // Ignore if a 10-second cooldown is already active
+            if (this._getInfoTimeout) {
+                this.log.debug('Manual refresh button ignored – still in cooldown');
+                return;
+            }
+
+            this.log.debug('Manual refresh button pressed');
+
+            if (this.lastFilename) {
+                this.log.debug(`Triggering metadata refresh for "${this.lastFilename}"`);
+                this._fetchFileMetadata(this.lastFilename).catch(e =>
+                    this.log.warn(`Failed to fetch file metadata: ${e.message}`)
+                );
+            } else {
+                this.log.info('Kein aktiver Druckjob - Refresh nicht möglich');
+            }
+
+            // Reset button state back to false after 10 seconds
+            this._getInfoTimeout = this.setTimeout(() => {
+                this._getInfoTimeout = null;
+                this.setStateChanged('info.getInfo', false, true);
+            }, 10000);
             return;
         }
 
