@@ -23,10 +23,15 @@ class anycubic extends core.Adapter {
         this.command = new Command(this);
 
         // Track print progress for finish time estimation
+        this.allNodesCreated = false;
         this.printDuration = null;
         this.lastPrintDuration = null;
         this.printState = null; // cached print_stats.state for incremental diff handling
         this.estimatedTime = null; // cached estimated_time from job metadata
+        this.currentLayer = null; // cached current_layer from print_stats.info
+        this.lastCurrentLayer = null; // track last current_layer for change detection
+        this.totalLayer = null; // cached total_layer from print_stats.info
+        this.lastTotalLayer = null; // track last total_layer for change detection
         this.lastTotalTime = null;
         this.lastFilename = null; // track filename changes for metadata fetch
 
@@ -75,6 +80,7 @@ class anycubic extends core.Adapter {
                 this.log.info('Energy is off - not starting WebSocket connection. Toggle energy to connect.');
                 this.setStateChanged('info.connection', false, true);
                 await this.command.createCommandStates();
+                this.allNodesCreated = true;
                 return;
             }
         }
@@ -83,6 +89,7 @@ class anycubic extends core.Adapter {
 
         // Command-States anlegen
         await this.command.createCommandStates();
+        this.allNodesCreated = true;
 
         // Start the 15-second state write buffer flush interval
         this._flushInterval = setInterval(() => this._flushBuffer(), 15000);
@@ -171,18 +178,43 @@ class anycubic extends core.Adapter {
                 ? data.print_stats.print_duration
                 : null;
 
-            // Only recalculate when print_duration actually ticks forward
-            if (pd === this.lastPrintDuration) {
+            // Extract current_layer from print_stats.info
+            const cl = (data.print_stats?.info && typeof data.print_stats.info.current_layer === 'number')
+                ? data.print_stats.info.current_layer
+                : null;
+            if (cl != null) {
+                this.currentLayer = cl;
+            }
+
+            // Extract total_layer from print_stats.info
+            const tl = (data.print_stats?.info && typeof data.print_stats.info.total_layer === 'number')
+                ? data.print_stats.info.total_layer
+                : null;
+            if (tl != null) {
+                this.totalLayer = tl;
+            }
+
+            // Only recalculate when print_duration, current_layer, or total_layer actually changes
+            if (pd === this.lastPrintDuration && cl === this.lastCurrentLayer && tl === this.lastTotalLayer) {
                 return;
             }
             this.lastPrintDuration = pd;
+            this.lastCurrentLayer = cl;
+            this.lastTotalLayer = tl;
             if (pd != null) {
                 this.printDuration = pd;
             }
 
-            // Calculate remaining time: estimated_time - print_duration
-            if (this.estimatedTime != null && this.printDuration != null) {
-                const remaining = Math.max(0, this.estimatedTime - this.printDuration);
+            // Neue Formel: Mittelwert aus zwei Schätzmethoden
+            // method1 = estimated_total - print_duration
+            // method2 = estimated_total * (1 - current_layer / total_layer)
+            // totalTime = (method1 + method2) / 2
+            if (this.estimatedTime != null && this.printDuration != null
+                && this.currentLayer != null && this.totalLayer != null
+                && this.totalLayer !== 0) {
+                const method1 = Math.max(0, this.estimatedTime - this.printDuration);
+                const method2 = Math.max(0, this.estimatedTime * (1 - this.currentLayer / this.totalLayer));
+                const remaining = Math.max(0, (method1 + method2) / 2);
                 const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
                 const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
                 const seconds = String(Math.floor(remaining % 60)).padStart(2, '0');
@@ -207,6 +239,10 @@ class anycubic extends core.Adapter {
                 this.printDuration = null;
                 this.lastPrintDuration = null;
                 this.estimatedTime = null;
+                this.currentLayer = null;
+                this.lastCurrentLayer = null;
+                this.totalLayer = null;
+                this.lastTotalLayer = null;
                 this.lastTotalTime = null;
             }
         }
@@ -227,7 +263,7 @@ class anycubic extends core.Adapter {
         }
 
         const url = `http://${ip}:${port}/server/files/metadata?filename=${encodeURIComponent(filename)}`;
-        this.log.debug(`Fetching file metadata: ${url}`);
+        this.setStateChanged('info.dataError', '', true);
 
         try {
             const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -338,7 +374,7 @@ class anycubic extends core.Adapter {
 
             // Clear getInfo timeout if active
             if (this._getInfoTimeout) {
-                this.clearTimeout(this._getInfoTimeout);
+                clearTimeout(this._getInfoTimeout);
                 this._getInfoTimeout = null;
             }
 
@@ -508,7 +544,7 @@ class anycubic extends core.Adapter {
             }
 
             // Reset button state back to false after 10 seconds
-            this._getInfoTimeout = this.setTimeout(() => {
+            this._getInfoTimeout = setTimeout(() => {
                 this._getInfoTimeout = null;
                 this.setStateChanged('info.getInfo', false, true);
             }, 10000);
