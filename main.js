@@ -194,35 +194,12 @@ class anycubic extends core.Adapter {
                 this.totalLayer = tl;
             }
 
-            // Only recalculate when print_duration, current_layer, or total_layer actually changes
-            if (pd === this.lastPrintDuration && cl === this.lastCurrentLayer && tl === this.lastTotalLayer) {
-                return;
-            }
+            // Cache print_duration when present
             this.lastPrintDuration = pd;
             this.lastCurrentLayer = cl;
             this.lastTotalLayer = tl;
             if (pd != null) {
                 this.printDuration = pd;
-            }
-
-            // Neue Formel: Mittelwert aus zwei Schätzmethoden
-            // method1 = estimated_total - print_duration
-            // method2 = estimated_total * (1 - current_layer / total_layer)
-            // totalTime = (method1 + method2) / 2
-            if (this.estimatedTime != null && this.printDuration != null
-                && this.currentLayer != null && this.totalLayer != null
-                && this.totalLayer !== 0) {
-                const method1 = Math.max(0, this.estimatedTime - this.printDuration);
-                const method2 = Math.max(0, this.estimatedTime * (1 - this.currentLayer / this.totalLayer));
-                const remaining = Math.max(0, (method1 + method2) / 2);
-                const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
-                const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
-                const seconds = String(Math.floor(remaining % 60)).padStart(2, '0');
-                const formattedTotal = `${hours}:${minutes}:${seconds}`;
-                if (formattedTotal !== this.lastTotalTime) {
-                    this._bufferStateChange('info.totalTime', formattedTotal, true);
-                    this.lastTotalTime = formattedTotal;
-                }
             }
         } else if (rawState !== undefined) {
             // rawState is explicitly set to a non-printing value (complete,
@@ -244,6 +221,33 @@ class anycubic extends core.Adapter {
                 this.totalLayer = null;
                 this.lastTotalLayer = null;
                 this.lastTotalTime = null;
+            }
+        }
+    }
+
+    /**
+     * Berechnet info.totalTime aus den gecachten Werten.
+     * Formel: ((estimatedTime - printDuration) + (estimatedTime * (1 - currentLayer / totalLayer))) / 2
+     * Wird aufgerufen, wenn print_stats.print_duration sich ändert.
+     */
+    _calcTotalTime() {
+        if (this.printState !== 'printing') {
+            return;
+        }
+
+        if (this.estimatedTime != null && this.printDuration != null
+            && this.currentLayer != null && this.totalLayer != null
+            && this.totalLayer !== 0) {
+            const method1 = Math.max(0, this.estimatedTime - this.printDuration);
+            const method2 = Math.max(0, this.estimatedTime * (1 - this.currentLayer / this.totalLayer));
+            const remaining = Math.max(0, (method1 + method2) / 2);
+            const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
+            const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
+            const seconds = String(Math.floor(remaining % 60)).padStart(2, '0');
+            const formattedTotal = `${hours}:${minutes}:${seconds}`;
+            if (formattedTotal !== this.lastTotalTime) {
+                this._bufferStateChange('info.totalTime', formattedTotal, true);
+                this.lastTotalTime = formattedTotal;
             }
         }
     }
@@ -516,6 +520,13 @@ class anycubic extends core.Adapter {
             } catch (e) {
                 this.log.warn(`Error closing websocket: ${e.message}`);
             }
+            return;
+        }
+
+        // === print_stats.print_duration: trigger totalTime recalculation ===
+        if (id === `${this.namespace}.print_stats.print_duration`) {
+            this.printDuration = state.val;
+            this._calcTotalTime();
             return;
         }
 
