@@ -439,87 +439,93 @@ class anycubic extends core.Adapter {
     }
 
     async onStateChange(id, state) {
-        if (!state || state.ack) {
-            return;
-        }
+        // Energy state changes must be processed regardless of ack flag,
+        // because external device adapters (e.g. Shelly) send updates with ack: true.
+        if (this.energyId && id === this.energyId) {
+            if (state && state.val === true) {
+                this.log.debug(`Energy state changed to true - (re)starting printer connection`);
+                obj102_done = false;
 
-        // If energy state changed to true, re-trigger subscription
-        if (this.energyId && id === this.energyId && state.val === true) {
-            this.log.debug(`Energy state changed to true - (re)starting printer connection`);
-            obj102_done = false;
-
-            // Close existing connection first
-            try {
-                if (this.websocketController) {
-                    this.websocketController.closeConnection();
-                }
-            } catch (e) {
-                this.log.debug(`Error closing websocket on energy true: ${e.message}`);
-            }
-            this.setStateChanged('info.connection', false, true);
-
-            // Clear any existing countdown interval
-            if (this._waitPrinterInterval) {
-                clearInterval(this._waitPrinterInterval);
-                this._waitPrinterInterval = null;
-            }
-
-            const waitSeconds = parseInt(this.config.waitForPrinter) || 0;
-
-            // Start countdown: set initial value and start decrement interval
-            let countdownRemaining = waitSeconds;
-            this.setStateChanged('info.waitForPrinter', countdownRemaining, true);
-
-            if (countdownRemaining > 0) {
-                this._waitPrinterInterval = setInterval(() => {
-                    countdownRemaining--;
-                    if (countdownRemaining <= 0) {
-                        clearInterval(this._waitPrinterInterval);
-                        this._waitPrinterInterval = null;
-                        this.setStateChanged('info.waitForPrinter', 0, true);
-                    } else {
-                        this.setStateChanged('info.waitForPrinter', countdownRemaining, true);
+                // Close existing connection first
+                try {
+                    if (this.websocketController) {
+                        this.websocketController.closeConnection();
                     }
-                }, 1000);
+                } catch (e) {
+                    this.log.debug(`Error closing websocket on energy true: ${e.message}`);
+                }
+                this.setStateChanged('info.connection', false, true);
+
+                // Clear any existing countdown interval
+                if (this._waitPrinterInterval) {
+                    clearInterval(this._waitPrinterInterval);
+                    this._waitPrinterInterval = null;
+                }
+
+                const waitSeconds = parseInt(this.config.waitForPrinter) || 0;
+
+                // Start countdown: set initial value and start decrement interval
+                let countdownRemaining = waitSeconds;
+                this.setStateChanged('info.waitForPrinter', countdownRemaining, true);
+
+                if (countdownRemaining > 0) {
+                    this._waitPrinterInterval = setInterval(() => {
+                        countdownRemaining--;
+                        if (countdownRemaining <= 0) {
+                            clearInterval(this._waitPrinterInterval);
+                            this._waitPrinterInterval = null;
+                            this.setStateChanged('info.waitForPrinter', 0, true);
+                        } else {
+                            this.setStateChanged('info.waitForPrinter', countdownRemaining, true);
+                        }
+                    }, 1000);
+                }
+
+                if (waitSeconds > 0) {
+                    this.log.debug(`Waiting ${waitSeconds}s for printer to boot up...`);
+                    await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+                }
+
+                // Ensure countdown is cleared after the wait completes
+                if (this._waitPrinterInterval) {
+                    clearInterval(this._waitPrinterInterval);
+                    this._waitPrinterInterval = null;
+                }
+                this.setStateChanged('info.waitForPrinter', 0, true);
+
+                this.startWebsocket(true);
+                return;
             }
 
-            if (waitSeconds > 0) {
-                this.log.debug(`Waiting ${waitSeconds}s for printer to boot up...`);
-                await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+            if (state && state.val === false) {
+                this.log.debug(`Energy state changed to false - closing websocket connection`);
+                obj102_done = false;
+                this.setStateChanged('info.connection', false, true);
+
+                // Clear any existing countdown interval
+                if (this._waitPrinterInterval) {
+                    clearInterval(this._waitPrinterInterval);
+                    this._waitPrinterInterval = null;
+                }
+                // Reset countdown state to configured value
+                this.setStateChanged('info.waitForPrinter', parseInt(this.config.waitForPrinter) || 0, true);
+
+                try {
+                    if (this.websocketController) {
+                        this.websocketController.closeConnection();
+                    }
+                } catch (e) {
+                    this.log.warn(`Error closing websocket: ${e.message}`);
+                }
+                return;
             }
 
-            // Ensure countdown is cleared after the wait completes
-            if (this._waitPrinterInterval) {
-                clearInterval(this._waitPrinterInterval);
-                this._waitPrinterInterval = null;
-            }
-            this.setStateChanged('info.waitForPrinter', 0, true);
-
-            this.startWebsocket(true);
+            // Energy ID matched but state is null/undefined – nothing to do
             return;
         }
 
-        // If energy state changed to false, close the websocket connection
-        if (this.energyId && id === this.energyId && state.val === false) {
-            this.log.debug(`Energy state changed to false - closing websocket connection`);
-            obj102_done = false;
-            this.setStateChanged('info.connection', false, true);
-
-            // Clear any existing countdown interval
-            if (this._waitPrinterInterval) {
-                clearInterval(this._waitPrinterInterval);
-                this._waitPrinterInterval = null;
-            }
-            // Reset countdown state to configured value
-            this.setStateChanged('info.waitForPrinter', parseInt(this.config.waitForPrinter) || 0, true);
-
-            try {
-                if (this.websocketController) {
-                    this.websocketController.closeConnection();
-                }
-            } catch (e) {
-                this.log.warn(`Error closing websocket: ${e.message}`);
-            }
+        // All other state changes must pass the ack filter
+        if (!state || state.ack) {
             return;
         }
 
