@@ -38,6 +38,7 @@ class anycubic extends core.Adapter {
         // State write buffer: stores path -> { value, ack } for deferred writes
         this._stateBuffer = new Map();
         this._flushInterval = null;
+        this._lastEnergyVal = undefined;
 
         this.on('ready', () => {
             this.onReady().catch((e) => {
@@ -442,6 +443,11 @@ class anycubic extends core.Adapter {
         // Energy state changes must be processed regardless of ack flag,
         // because external device adapters (e.g. Shelly) send updates with ack: true.
         if (this.energyId && id === this.energyId) {
+            if (state && state.val === this._lastEnergyVal) {
+                return;
+            }
+            this._lastEnergyVal = state ? state.val : undefined;
+
             if (state && state.val === true) {
                 this.log.debug(`Energy state changed to true - (re)starting printer connection`);
                 obj102_done = false;
