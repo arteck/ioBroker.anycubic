@@ -202,6 +202,9 @@ class anycubic extends core.Adapter {
             if (pd != null) {
                 this.printDuration = pd;
             }
+
+            // Recalculate totalTime after all relevant values are refreshed
+            this._calcTotalTime();
         } else if (rawState !== undefined) {
             // rawState is explicitly set to a non-printing value (complete,
             // cancelled, error, standby, paused).  Only act on explicit state
@@ -229,7 +232,7 @@ class anycubic extends core.Adapter {
     /**
      * Berechnet info.totalTime aus den gecachten Werten.
      * Formel: ((estimatedTime - printDuration) + (estimatedTime * (1 - currentLayer / totalLayer))) / 2
-     * Wird aufgerufen, wenn print_stats.print_duration sich ändert.
+     * Wird von _updateFinishTime() nach jeder notify_status_update-Nachricht aufgerufen.
      */
     _calcTotalTime() {
         if (this.printState !== 'printing') {
@@ -535,12 +538,11 @@ class anycubic extends core.Adapter {
             return;
         }
 
-        // === print_stats.print_duration: trigger totalTime recalculation ===
-        if (id === `${this.namespace}.print_stats.print_duration`) {
-            this.printDuration = state.val;
-            this._calcTotalTime();
-            return;
-        }
+        // NOTE: print_stats.print_duration handling was removed from here because
+        // the ack filter above (line 534: `if (!state || state.ack)`) rejects all
+        // adapter-written states (ack: true), making this branch unreachable.
+        // _calcTotalTime() is now called directly from _updateFinishTime() via
+        // WebSocket notify_status_update messages instead.
 
         // === Command States ausführen (ausgelagert in command.js) ===
         if (await this.command.handleCommand(id, state)) {
