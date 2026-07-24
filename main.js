@@ -565,7 +565,7 @@ class anycubic extends core.Adapter {
                     this.log.warn(`Failed to fetch file metadata: ${e.message}`)
                 );
             } else {
-                this.log.info('Kein aktiver Druckjob - Refresh nicht möglich');
+                this.log.info('No active print job - refresh not possible');
             }
 
             // Reset button state back to false after 10 seconds
@@ -580,12 +580,9 @@ class anycubic extends core.Adapter {
             return;
         }
 
-        if (state && state.ack === false) {
-            if (id.endsWith('info.debugId')) {
-                this.setStateChanged(id, state.val, true);
-                return;
-            }
-        }
+        // NOTE: info.debugId handling was removed because the state was never
+        // defined, created, or subscribed anywhere. The redundant `state && state.ack === false`
+        // guard was also dead — line 537 already guarantees both conditions by this point.
     }
 }
 
