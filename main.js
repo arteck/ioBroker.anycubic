@@ -413,6 +413,47 @@ class anycubic extends core.Adapter {
     }
 
     /**
+     * Writes a single metadata field to the object tree, creating the state
+     * definition on demand. Scalars (string/number/boolean) are written directly;
+     * arrays/objects are stored as JSON strings so nothing gets lost.
+     *
+     * @param {string} path - Full state path (e.g. "job.metadata.slicer").
+     * @param {string} key - The metadata key (used for the state name).
+     * @param {*} value - The value to write.
+     */
+    async _writeMetadataField(path, key, value) {
+        if (value === null || value === undefined) {
+            return;
+        }
+
+        let type;
+        let role;
+        let outValue = value;
+
+        if (typeof value === 'number') {
+            type = 'number';
+            role = 'value';
+        } else if (typeof value === 'boolean') {
+            type = 'boolean';
+            role = 'indicator';
+        } else if (typeof value === 'string') {
+            type = 'string';
+            role = 'text';
+        } else {
+            // Arrays / nested objects → store as JSON string
+            type = 'string';
+            role = 'json';
+            outValue = JSON.stringify(value);
+        }
+
+        await this.setObjectNotExistsAsync(path, {
+            type: 'state',
+            common: { name: key, type, role, read: true, write: false },
+        });
+        await this.setStateAsync(path, outValue, true);
+    }
+
+    /**
      * Buffers a state change for deferred write (15-second flush interval).
      * Only the latest value per path is kept — previous writes are overwritten.
      *

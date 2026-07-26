@@ -6,6 +6,8 @@
 	"Select and configure your Anycubic connection": "Selecione e configure a conexão Anycubic",
 	"Websocket IP-Address": "Endereço IP do Websocket",
 	"Websocket Port": "Porta Websocket",
+	"Refresh rate (sec)": "Taxa de atualização (seg)",
+	"The lower the refresh rate, the more states are written to the ioBroker database. This can lead to a high load on the ioBroker system and the database. A refresh rate of 10 seconds is recommended.": "Quanto menor a taxa de atualização, mais estados são gravados no banco de dados do ioBroker. Isso pode levar a uma carga elevada no sistema ioBroker e no banco de dados. Recomenda-se uma taxa de atualização de 10 segundos.",
 	"Configure your Anycubic WebUi connection": "Configurar conexão Anycubic WebUi",
 	"WebUi IP-Address": "Endereço IP do WebUi",
 	"WebUi Port": "Porta WebUI",

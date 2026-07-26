@@ -6,6 +6,8 @@
 	"Select and configure your Anycubic connection": "Выберите и настройте подключение Anycubic",
 	"Websocket IP-Address": "IP-адрес Websocket",
 	"Websocket Port": "Порт WebSocket",
+	"Refresh rate (sec)": "Частота обновления (сек)",
+	"The lower the refresh rate, the more states are written to the ioBroker database. This can lead to a high load on the ioBroker system and the database. A refresh rate of 10 seconds is recommended.": "Чем ниже частота обновления, тем больше состояний записывается в базу данных ioBroker. Это может привести к высокой нагрузке на систему ioBroker и базу данных. Рекомендуется частота обновления 10 секунд.",
 	"Configure your Anycubic WebUi connection": "Настройте подключение Anycubic WebUi",
 	"WebUi IP-Address": "IP-адрес WebUi",
 	"WebUi Port": "Порт WebUi",
