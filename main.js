@@ -112,13 +112,23 @@ class anycubic extends core.Adapter {
                 if (messageObj?.method) {
                     request = messageObj.params;
                     await this.helper.parseMethod(request, this.parseOptions);
+
+                    // Track print progress data and calculate finish time
+                    // (only notify_status_update carries incremental status diffs)
+                    if (messageObj.method === 'notify_status_update') {
+                        const params = messageObj.params;
+                        const data = Array.isArray(params) ? params[0] : params;
+                        this._updateFinishTime(data);
+                    }
                 } else if (messageObj?.result?.status) {
                     request = messageObj.result.status;
                     await this.helper.parseStart(request, this.parseOptions);
-                }
 
-                // Track print progress data and calculate finish time
-                this._updateFinishTime(messageObj);
+                    // The initial full-status response also carries print_stats/job data.
+                    // Feed it into the finish-time logic so a (re)connect mid-print
+                    // correctly initialises filename, state and estimatedTime.
+                    this._updateFinishTime(messageObj.result.status);
+                }
         } catch (err) {
             this.log.error(err);
             this.log.error(`<anycubic> error message -->> ${message}`);
@@ -126,20 +136,7 @@ class anycubic extends core.Adapter {
         }
     }
 
-    _updateFinishTime(messageObj) {
-        // Fix 3: Only process notify_status_update messages (carries printer status data)
-        if (messageObj?.method !== 'notify_status_update') {
-            return;
-        }
-
-        const params = messageObj.params;
-        let data;
-        if (Array.isArray(params)) {
-            data = params[0];
-        } else {
-            data = params;
-        }
-
+    _updateFinishTime(data) {
         if (!data || typeof data !== 'object') {
             return;
         }
@@ -253,6 +250,11 @@ class anycubic extends core.Adapter {
                 this._bufferStateChange('info.totalTime', formattedTotal, true);
                 this.lastTotalTime = formattedTotal;
             }
+        } else {
+            this.log.debug(
+                `_calcTotalTime skipped - missing values: estimatedTime=${this.estimatedTime}, ` +
+                `printDuration=${this.printDuration}, currentLayer=${this.currentLayer}, totalLayer=${this.totalLayer}`
+            );
         }
     }
 
@@ -544,12 +546,8 @@ class anycubic extends core.Adapter {
         // _calcTotalTime() is now called directly from _updateFinishTime() via
         // WebSocket notify_status_update messages instead.
 
-        // === Command States ausführen (ausgelagert in command.js) ===
-        if (await this.command.handleCommand(id, state)) {
-            return;
-        }
-
-        // === Manual refresh button (info.getInfo) ===
+        // === Manual refresh button (info.getInfo) === must be handled BEFORE
+        // handleCommand so the button is always reset, even if a command dispatch returns.
         if (id === `${this.namespace}.info.getInfo` && state.val === true) {
             // Ignore if a 10-second cooldown is already active
             if (this._getInfoTimeout) {
@@ -571,8 +569,15 @@ class anycubic extends core.Adapter {
             // Reset button state back to false after 10 seconds
             this._getInfoTimeout = setTimeout(() => {
                 this._getInfoTimeout = null;
-                this.setStateChanged('info.getInfo', false, true);
+                this.setStateAsync('info.getInfo', false, true).catch(e =>
+                    this.log.warn(`Failed to reset info.getInfo: ${e.message}`)
+                );
             }, 10000);
+            return;
+        }
+
+        // === Command States ausführen (ausgelagert in command.js) ===
+        if (await this.command.handleCommand(id, state)) {
             return;
         }
 
