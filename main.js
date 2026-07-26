@@ -82,6 +82,7 @@ class anycubic extends core.Adapter {
                 this.setStateChanged('info.connection', false, true);
                 await this.command.createCommandStates();
                 this.allNodesCreated = true;
+                this.subscribeStates('info.getInfo');
                 return;
             }
         }
@@ -92,8 +93,38 @@ class anycubic extends core.Adapter {
         await this.command.createCommandStates();
         this.allNodesCreated = true;
 
+        // Restore cached progress values from existing states so a restart
+        // mid-print can still calculate info.totalTime before new WS data arrives.
+        await this._restoreProgressCache();
+
+        // Subscribe to the manual refresh button so onStateChange receives its presses
+        this.subscribeStates('info.getInfo');
+
         // Start the 15-second state write buffer flush interval
         this._flushInterval = setInterval(() => this._flushBuffer(), this.config.wsRefreshRate || 15000);
+    }
+
+    /**
+     * Restores cached progress variables (estimatedTime, layers, filename) from
+     * already persisted states. Needed after an adapter restart mid-print, where
+     * the WebSocket only sends incremental diffs that may omit these fields.
+     */
+    async _restoreProgressCache() {
+        try {
+            const est = await this.getStateAsync('job.metadata.estimated_time');
+            if (est && typeof est.val === 'number') {
+                this.estimatedTime = est.val;
+            }
+            const fn = await this.getStateAsync('print_stats.filename');
+            if (fn && typeof fn.val === 'string' && fn.val) {
+                this.lastFilename = fn.val;
+            }
+            this.log.debug(
+                `_restoreProgressCache: estimatedTime=${this.estimatedTime}, lastFilename=${this.lastFilename}`
+            );
+        } catch (e) {
+            this.log.debug(`_restoreProgressCache failed: ${e.message}`);
+        }
     }
 
     async messageParse(message) {
@@ -200,7 +231,9 @@ class anycubic extends core.Adapter {
             }
 
             // Recalculate totalTime after all relevant values are refreshed
-            this._calcTotalTime();
+            this._calcTotalTime().catch(e =>
+                this.log.warn(`_calcTotalTime failed: ${e.message}`)
+            );
         } else if (rawState !== undefined) {
             // rawState is explicitly set to a non-printing value (complete,
             // cancelled, error, standby, paused).  Only act on explicit state
@@ -230,9 +263,37 @@ class anycubic extends core.Adapter {
      * Formel: ((estimatedTime - printDuration) + (estimatedTime * (1 - currentLayer / totalLayer))) / 2
      * Wird von _updateFinishTime() nach jeder notify_status_update-Nachricht aufgerufen.
      */
-    _calcTotalTime() {
+    async _calcTotalTime() {
         if (this.printState !== 'printing') {
             return;
+        }
+
+        // Fallback: pull any missing value directly from the persisted state tree.
+        // Moonraker sends incremental diffs, so a single field may not yet be cached
+        // even though its state already exists in the object tree.
+        if (this.estimatedTime == null) {
+            const s = await this.getStateAsync('job.metadata.estimated_time');
+            if (s && typeof s.val === 'number') {
+                this.estimatedTime = s.val;
+            }
+        }
+        if (this.printDuration == null) {
+            const s = await this.getStateAsync('print_stats.print_duration');
+            if (s && typeof s.val === 'number') {
+                this.printDuration = s.val;
+            }
+        }
+        if (this.currentLayer == null) {
+            const s = await this.getStateAsync('print_stats.info.current_layer');
+            if (s && typeof s.val === 'number') {
+                this.currentLayer = s.val;
+            }
+        }
+        if (this.totalLayer == null) {
+            const s = await this.getStateAsync('print_stats.info.total_layer');
+            if (s && typeof s.val === 'number') {
+                this.totalLayer = s.val;
+            }
         }
 
         if (this.estimatedTime != null && this.printDuration != null
@@ -291,6 +352,17 @@ class anycubic extends core.Adapter {
                 });
                 await this.setStateAsync('job.metadata.estimated_time', result.estimated_time, true);
                 this.log.debug(`estimated_time set to ${this.estimatedTime}s for "${filename}"`);
+            }
+
+            // Dynamically map every scalar metadata field into job.metadata.*
+            // (skips estimated_time – handled above – and thumbnails – handled below).
+            if (result && typeof result === 'object') {
+                for (const [key, value] of Object.entries(result)) {
+                    if (key === 'estimated_time' || key === 'thumbnails') {
+                        continue;
+                    }
+                    await this._writeMetadataField(`job.metadata.${key}`, key, value);
+                }
             }
 
             if (result?.thumbnails && Array.isArray(result.thumbnails)) {
