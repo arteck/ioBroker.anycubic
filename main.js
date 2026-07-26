@@ -106,7 +106,6 @@ class anycubic extends core.Adapter {
         this.log.debug(`--->>> fromAnycubic_RAW_1 -> ${JSON.stringify(messageObj)}`);
 
         let request;
-        let shouldQuery = true;
 
         try {
                 if (messageObj?.method) {
@@ -206,9 +205,9 @@ class anycubic extends core.Adapter {
             // rawState is explicitly set to a non-printing value (complete,
             // cancelled, error, standby, paused).  Only act on explicit state
             // transitions — don't clear just because state is absent from a diff.
-            if (this.lastTotalTime !== '') {
-                this._bufferStateChange('info.totalTime', '', true);
-                this.lastTotalTime = '';
+            if (this.lastTotalTime !== '--:--:--') {
+                this._bufferStateChange('info.totalTime', '--:--:--', true);
+                this.lastTotalTime = '--:--:--';
             }
 
             // Reset instance variables on print end states
@@ -221,7 +220,7 @@ class anycubic extends core.Adapter {
                 this.lastCurrentLayer = null;
                 this.totalLayer = null;
                 this.lastTotalLayer = null;
-                this.lastTotalTime = null;
+                this.lastTotalTime = '--:--:--';
             }
         }
     }
