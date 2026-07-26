@@ -101,7 +101,7 @@ class anycubic extends core.Adapter {
         this.subscribeStates('info.getInfo');
 
         // Start the 15-second state write buffer flush interval
-        this._flushInterval = setInterval(() => this._flushBuffer(), this.config.wsRefreshRate || 15000);
+        this._flushInterval = setInterval(() => this._flushBuffer(), this.config.wsRefreshRate * 1000 || 15000);
     }
 
     /**
