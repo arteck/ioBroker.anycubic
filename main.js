@@ -93,7 +93,7 @@ class anycubic extends core.Adapter {
         this.allNodesCreated = true;
 
         // Start the 15-second state write buffer flush interval
-        this._flushInterval = setInterval(() => this._flushBuffer(), 15000);
+        this._flushInterval = setInterval(() => this._flushBuffer(), this.config.wsRefreshRate || 15000);
     }
 
     async messageParse(message) {

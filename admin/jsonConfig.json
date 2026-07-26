@@ -93,6 +93,20 @@
           "lg": 4,
           "xl": 4
         },
+        "wsRefreshRate": {
+          "type": "number",
+          "label": "Refresh rate (sec)",
+          "help": "The lower the refresh rate, the more states are written to the ioBroker database. This can lead to a high load on the ioBroker system and the database. A refresh rate of 10 seconds is recommended.",
+          "newLine": false,
+          "min": 1,
+          "max": 120,
+          "default": 10,
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 4,
+          "xl": 4
+        },
         "webUIHeader": {
           "type": "header",
           "text": "Configure your Anycubic WebUi connection",
