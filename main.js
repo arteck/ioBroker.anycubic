@@ -158,6 +158,17 @@ class anycubic extends core.Adapter {
                     // Feed it into the finish-time logic so a (re)connect mid-print
                     // correctly initialises filename, state and estimatedTime.
                     this._updateFinishTime(messageObj.result.status);
+                } else if (messageObj?.error) {
+                    // JSON-RPC error response (e.g. an unknown gcode macro was sent
+                    // via command.*). Without this branch such errors were silently
+                    // swallowed, so failed commands looked like "nothing happened".
+                    const errMsg = messageObj.error?.message || JSON.stringify(messageObj.error);
+                    this.log.warn(`<anycubic> command/request failed (id=${messageObj.id}): ${errMsg}`);
+                    this.setStateChanged('info.dataError', errMsg, true);
+                } else if (typeof messageObj?.id === 'number' && messageObj.id >= 200 && messageObj.id < 1200 && 'result' in messageObj) {
+                    // Acknowledgement of a gcode command sent from handleCommand()
+                    // (message ids are 200..1199). Log it so successful sends are visible.
+                    this.log.debug(`<anycubic> command ack (id=${messageObj.id}): ${JSON.stringify(messageObj.result)}`);
                 }
         } catch (err) {
             this.log.error(err);
