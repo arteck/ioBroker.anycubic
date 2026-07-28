@@ -62,6 +62,22 @@ class anycubic extends core.Adapter {
         // Expose buffer method to helper so all dynamic states go through the buffer
         this._bufferStateChange = this._bufferStateChange.bind(this);
 
+        // Readonly-State info.webIP im Format "webUIServer:webUIPort" anlegen/aktualisieren
+        await this.setObjectNotExistsAsync('info.webIP', {
+            type: 'state',
+            common: {
+                name: 'WebUi IP-Address',
+                type: 'string',
+                role: 'info.ip',
+                read: true,
+                write: false,
+                def: '',
+            },
+            native: {},
+        });
+        const webIP = `${this.config.webUIServer || ''}:${this.config.webUIPort || ''}`;
+        this.setStateChanged('info.webIP', webIP, true);
+
         // WebSocket-Verbindung
         if (!this.config.wsServerIP) {
             this.log.warn('Please configure the Websocket connection!');
