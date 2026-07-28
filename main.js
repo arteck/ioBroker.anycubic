@@ -56,6 +56,7 @@ class anycubic extends core.Adapter {
         this.on('unload', this.onUnload.bind(this));
     }
 
+
     async onReady() {
         this.setStateChanged('info.connection', false, true);
 
