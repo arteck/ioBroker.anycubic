@@ -266,13 +266,25 @@ class anycubic extends core.Adapter {
             // rawState is explicitly set to a non-printing value (complete,
             // cancelled, error, standby, paused).  Only act on explicit state
             // transitions — don't clear just because state is absent from a diff.
-            if (this.lastTotalTime !== '--:--:--') {
-                this._bufferStateChange('info.totalTime', '--:--:--', true);
-                this.lastTotalTime = '--:--:--';
-            }
 
             // Reset instance variables on print end states
             if (rawState === 'complete' || rawState === 'cancelled' || rawState === 'error' || rawState === 'standby') {
+                // For "complete", set totalTime to the formatted print_duration
+                // (actual total elapsed time) before variables are nullified
+                if (rawState === 'complete' && this.printDuration != null) {
+                    const pd = this.printDuration;
+                    const hours = String(Math.floor(pd / 3600)).padStart(2, '0');
+                    const minutes = String(Math.floor((pd % 3600) / 60)).padStart(2, '0');
+                    const seconds = String(Math.floor(pd % 60)).padStart(2, '0');
+                    const formattedDuration = `${hours}:${minutes}:${seconds}`;
+                    this._bufferStateChange('info.totalTime', formattedDuration, true);
+                    this.lastTotalTime = formattedDuration;
+                } else if (this.lastTotalTime !== '--:--:--') {
+                    // For cancelled, error, standby — reset to placeholder
+                    this._bufferStateChange('info.totalTime', '--:--:--', true);
+                    this.lastTotalTime = '--:--:--';
+                }
+
                 this.printState = null;
                 this.printDuration = null;
                 this.lastPrintDuration = null;
@@ -281,6 +293,13 @@ class anycubic extends core.Adapter {
                 this.lastCurrentLayer = null;
                 this.totalLayer = null;
                 this.lastTotalLayer = null;
+                // Don't reset lastTotalTime for "complete" — it holds the formatted duration
+                if (rawState !== 'complete') {
+                    this.lastTotalTime = '--:--:--';
+                }
+            } else if (this.lastTotalTime !== '--:--:--') {
+                // For non-terminal states like "paused", still reset totalTime
+                this._bufferStateChange('info.totalTime', '--:--:--', true);
                 this.lastTotalTime = '--:--:--';
             }
         }
