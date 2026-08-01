@@ -368,6 +368,7 @@ class anycubic extends core.Adapter {
     /**
      * Fetches file metadata from the printer's HTTP API.
      * Extracts estimated_time for finish-time calculation and thumbnail data.
+     *
      * @param {string} filename - The filename to fetch metadata for.
      */
     async _fetchFileMetadata(filename) {
