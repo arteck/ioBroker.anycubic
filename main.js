@@ -380,7 +380,9 @@ class anycubic extends core.Adapter {
             return;
         }
 
-        const url = `http://${ip}:${port}/server/files/metadata?filename=${encodeURIComponent(filename)}`;
+        const filePath = filename.includes('/') ? filename : `gcodes/${filename}`;
+        const encodedPath = filePath.split('/').map(part => encodeURIComponent(part)).join('/');
+        const url = `http://${ip}:${port}/server/files/metadata?filename=${encodedPath}`;
         this.setStateChanged('info.dataError', '', true);
 
         try {
