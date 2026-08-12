@@ -34,6 +34,7 @@ class anycubic extends core.Adapter {
         this.lastTotalLayer = null; // track last total_layer for change detection
         this.lastTotalTime = null;
         this.lastFilename = null; // track filename changes for metadata fetch
+        this.printProgress = null; // cached progress from virtual_sdcard (0.0 - 1.0)
 
         // State write buffer: stores path -> { value, ack } for deferred writes
         this._stateBuffer = new Map();
@@ -234,6 +235,14 @@ class anycubic extends core.Adapter {
                 ? data.print_stats.print_duration
                 : null;
 
+            // Extract progress from virtual_sdcard (0.0 - 1.0)
+            const prog = (data.virtual_sdcard && typeof data.virtual_sdcard.progress === 'number')
+                ? data.virtual_sdcard.progress
+                : null;
+            if (prog != null) {
+                this.printProgress = prog;
+            }
+
             // Extract current_layer from print_stats.info
             const cl = (data.print_stats?.info && typeof data.print_stats.info.current_layer === 'number')
                 ? data.print_stats.info.current_layer
@@ -307,7 +316,8 @@ class anycubic extends core.Adapter {
 
     /**
      * Berechnet info.totalTime aus den gecachten Werten.
-     * Formel: estimatedTime - printDuration (einfache Restzeit-Berechnung)
+     * Formel: Wie Mainsail's "Schätzung" - basiert auf virtuellem SD-Karten Fortschritt
+     * (print_duration / progress) - print_duration
      * Wird von _updateFinishTime() nach jeder notify_status_update-Nachricht aufgerufen.
      */
     async _calcTotalTime() {
@@ -318,16 +328,16 @@ class anycubic extends core.Adapter {
         // Fallback: pull any missing value directly from the persisted state tree.
         // Moonraker sends incremental diffs, so a single field may not yet be cached
         // even though its state already exists in the object tree.
-        if (this.estimatedTime == null) {
-            const s = await this.getStateAsync('job.metadata.estimated_time');
-            if (s && typeof s.val === 'number') {
-                this.estimatedTime = s.val;
-            }
-        }
         if (this.printDuration == null) {
             const s = await this.getStateAsync('print_stats.print_duration');
             if (s && typeof s.val === 'number') {
                 this.printDuration = s.val;
+            }
+        }
+        if (this.printProgress == null) {
+            const s = await this.getStateAsync('virtual_sdcard.progress');
+            if (s && typeof s.val === 'number') {
+                this.printProgress = s.val;
             }
         }
 
@@ -345,9 +355,11 @@ class anycubic extends core.Adapter {
             }
         }
 
-        // Vereinfachte Berechnung: nur estimatedTime - printDuration
-        if (this.estimatedTime != null && this.printDuration != null) {
-            const remaining = Math.max(0, this.estimatedTime - this.printDuration);
+        // Mainsail's "Schätzung" Formel: Fortschritts-basierte Extrapolation
+        // Restzeit = (verstrichene_Zeit / Fortschritt) - verstrichene_Zeit
+        if (this.printDuration != null && this.printProgress != null && this.printProgress > 0) {
+            const totalEstimated = this.printDuration / this.printProgress;
+            const remaining = Math.max(0, totalEstimated - this.printDuration);
             const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
             const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
             const seconds = String(Math.floor(remaining % 60)).padStart(2, '0');
@@ -358,8 +370,8 @@ class anycubic extends core.Adapter {
             }
         } else {
             this.log.debug(
-                `_calcTotalTime skipped - missing values: estimatedTime=${this.estimatedTime}, ` +
-                `printDuration=${this.printDuration}`
+                `_calcTotalTime skipped - missing values: printDuration=${this.printDuration}, ` +
+                `printProgress=${this.printProgress}`
             );
         }
     }

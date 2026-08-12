@@ -135,7 +135,7 @@
       "common": {
         "role": "text",
         "name": "remaining print time",
-        "desc": "Remaining time of current print job (HH:MM:SS format), based on printer-estimated total minus elapsed time",
+        "desc": "Remaining time of current print job (HH:MM:SS format), calculated from print progress like Mainsail's 'Estimate' field",
         "type": "string",
         "read": true,
         "write": false,
