@@ -307,7 +307,7 @@ class anycubic extends core.Adapter {
 
     /**
      * Berechnet info.totalTime aus den gecachten Werten.
-     * Formel: ((estimatedTime - printDuration) + (estimatedTime * (1 - currentLayer / totalLayer))) / 2
+     * Formel: estimatedTime - printDuration (einfache Restzeit-Berechnung)
      * Wird von _updateFinishTime() nach jeder notify_status_update-Nachricht aufgerufen.
      */
     async _calcTotalTime() {
@@ -330,6 +330,8 @@ class anycubic extends core.Adapter {
                 this.printDuration = s.val;
             }
         }
+
+        // Layer-Informationen werden weiterhin geladen für andere Zwecke
         if (this.currentLayer == null) {
             const s = await this.getStateAsync('print_stats.info.current_layer');
             if (s && typeof s.val === 'number') {
@@ -343,12 +345,9 @@ class anycubic extends core.Adapter {
             }
         }
 
-        if (this.estimatedTime != null && this.printDuration != null
-            && this.currentLayer != null && this.totalLayer != null
-            && this.totalLayer !== 0) {
-            const method1 = Math.max(0, this.estimatedTime - this.printDuration);
-            const method2 = Math.max(0, this.estimatedTime * (1 - this.currentLayer / this.totalLayer));
-            const remaining = Math.max(0, (method1 + method2) / 2);
+        // Vereinfachte Berechnung: nur estimatedTime - printDuration
+        if (this.estimatedTime != null && this.printDuration != null) {
+            const remaining = Math.max(0, this.estimatedTime - this.printDuration);
             const hours = String(Math.floor(remaining / 3600)).padStart(2, '0');
             const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
             const seconds = String(Math.floor(remaining % 60)).padStart(2, '0');
@@ -360,7 +359,7 @@ class anycubic extends core.Adapter {
         } else {
             this.log.debug(
                 `_calcTotalTime skipped - missing values: estimatedTime=${this.estimatedTime}, ` +
-                `printDuration=${this.printDuration}, currentLayer=${this.currentLayer}, totalLayer=${this.totalLayer}`
+                `printDuration=${this.printDuration}`
             );
         }
     }
