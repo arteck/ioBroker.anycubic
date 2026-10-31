@@ -89,6 +89,9 @@ class anycubic extends core.Adapter {
         const webIP = `${this.config.webUIServer || ''}:${this.config.webUIPort || ''}`;
         this.setStateChanged('info.webIP', webIP, true);
 
+        // Command-States anlegen (unabhängig von der Drucker-Konfiguration)
+        await this.command.createCommandStates();
+
         // WebSocket-Verbindung
         if (!this.config.wsServerIP) {
             this.log.warn('Please configure the Websocket connection!');
@@ -107,7 +110,6 @@ class anycubic extends core.Adapter {
             if (energyState && energyState.val === false) {
                 this.log.info('Energy is off - not starting WebSocket connection. Toggle energy to connect.');
                 this.setStateChanged('info.connection', false, true);
-                await this.command.createCommandStates();
                 this.allNodesCreated = true;
                 this.subscribeStates('info.getInfo');
                 return;
@@ -116,8 +118,7 @@ class anycubic extends core.Adapter {
 
         this.startWebsocket(false);
 
-        // Command-States anlegen
-        await this.command.createCommandStates();
+        // Command-States wurden bereits oben angelegt
         this.allNodesCreated = true;
 
         // Restore cached progress values from existing states so a restart
