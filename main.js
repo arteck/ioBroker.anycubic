@@ -4,6 +4,12 @@ const core = require('@iobroker/adapter-core');
 const {WebsocketController} = require('./lib/websocketController');
 const {Helper} = require('./lib/helper');
 const {Command} = require('./lib/command');
+const utils = require('./lib/utils');
+
+// Sources for the central info.dataError bookkeeping (see lib/utils.js)
+const ERR_SOURCE_PARSE = 'parse';
+const ERR_SOURCE_RPC = 'rpc';
+const ERR_SOURCE_METADATA = 'metadata';
 
 let obj102_done = false;
 
@@ -17,7 +23,8 @@ class anycubic extends core.Adapter {
         // Instanz-State statt Modul-globale Variablen
         this.websocketController = null;
         this.subscribeParameter = {};
-        this.messageParseMutex = Promise.resolve();
+        // Serialises message processing: every frame is chained onto this promise
+        this._parseChain = Promise.resolve();
         this.parseOptions = {write: false};
         this.helper = new Helper(this);
         this.command = new Command(this);
@@ -35,22 +42,24 @@ class anycubic extends core.Adapter {
         this.lastTotalTime = null;
         this.lastFilename = null; // track filename changes for metadata fetch
         this.printProgress = null; // cached progress from virtual_sdcard (0.0 - 1.0)
+        this._metadataInFlight = new Set(); // filenames with a running metadata fetch
 
         // State write buffer: stores path -> { value, ack } for deferred writes
         this._stateBuffer = new Map();
         this._flushInterval = null;
         this._lastEnergyVal = undefined;
 
+        // Centralised error sources → info.dataError is composed from all active ones
         this.on('ready', () => {
             this.onReady().catch((e) => {
                 this.log.error(`onReady error: ${e}`);
-                this.setStateChanged('info.dataError', e.message, true);
+                utils.setDataError(this, ERR_SOURCE_PARSE, e.message);
             });
         });
         this.on('stateChange', (id, state) => {
             this.onStateChange(id, state).catch((e) => {
                 this.log.error(`onStateChange error: ${e}`);
-                this.setStateChanged('info.dataError', e.message, true);
+                utils.setDataError(this, ERR_SOURCE_RPC, e.message);
             });
         });
 
@@ -146,12 +155,36 @@ class anycubic extends core.Adapter {
     }
 
     async messageParse(message) {
-        const lock = new Promise((resolve) => resolve());
-        const prev = this.messageParseMutex;
-        this.messageParseMutex = lock;
-        await prev;
+        // Real serialisation: every frame is appended to a promise chain, so it is
+        // only processed after the previous one finished. This removes the race
+        // conditions on printState/estimatedTime/lastFilename/... caused by the
+        // multiple notify_status_update frames per second.
+        // The catch keeps the chain alive — one failing frame never breaks it.
+        this._parseChain = (this._parseChain || Promise.resolve())
+            .then(() => this._parseMessage(message))
+            .catch(err => {
+                this.log.error(`<anycubic> message processing failed: ${err?.message || err}`);
+                utils.setDataError(this, ERR_SOURCE_PARSE, err?.message || String(err));
+            });
+        return this._parseChain;
+    }
 
-        let messageObj = JSON.parse(message);
+    /**
+     * Parses and dispatches a single websocket frame.
+     * Called strictly serialised from messageParse().
+     *
+     * @param {string|Buffer} message - Raw websocket message.
+     */
+    async _parseMessage(message) {
+        let messageObj;
+        try {
+            messageObj = JSON.parse(typeof message === 'string' ? message : message.toString());
+        } catch {
+            // Non-JSON frame: log and drop, so it cannot end as an unhandled rejection
+            this.log.debug(`<anycubic> ignoring non-JSON frame: ${String(message).slice(0, 200)}`);
+            return;
+        }
+
         this.log.debug(`--->>> fromAnycubic_RAW_1 -> ${JSON.stringify(messageObj)}`);
 
         let request;
@@ -182,16 +215,18 @@ class anycubic extends core.Adapter {
                     // swallowed, so failed commands looked like "nothing happened".
                     const errMsg = messageObj.error?.message || JSON.stringify(messageObj.error);
                     this.log.warn(`<anycubic> command/request failed (id=${messageObj.id}): ${errMsg}`);
-                    this.setStateChanged('info.dataError', errMsg, true);
+                    utils.setDataError(this, ERR_SOURCE_RPC, errMsg);
                 } else if (typeof messageObj?.id === 'number' && messageObj.id >= 200 && messageObj.id < 1200 && 'result' in messageObj) {
-                    // Acknowledgement of a gcode command sent from handleCommand()
-                    // (message ids are 200..1199). Log it so successful sends are visible.
-                    this.log.debug(`<anycubic> command ack (id=${messageObj.id}): ${JSON.stringify(messageObj.result)}`);
+                    // Nicht zuordenbare Antwort auf ein Kommando. Antworten zu offenen
+                    // Requests werden bereits im WebsocketController über die
+                    // pendingRequests-Map korreliert und erreichen diese Stelle nicht.
+                    // Hier wird nur noch geloggt – es wird KEIN Kommando-Erfolg mehr abgeleitet.
+                    this.log.debug(`<anycubic> unhandled response (id=${messageObj.id}): ${JSON.stringify(messageObj.result)}`);
                 }
         } catch (err) {
             this.log.error(err);
             this.log.error(`<anycubic> error message -->> ${message}`);
-            this.setStateChanged('info.dataError', err.message || String(err), true);
+            utils.setDataError(this, ERR_SOURCE_PARSE, err.message || String(err));
         }
     }
 
@@ -383,21 +418,27 @@ class anycubic extends core.Adapter {
      * @param {string} filename - The filename to fetch metadata for.
      */
     async _fetchFileMetadata(filename) {
-        const ip = this.config.webUIServer;
-        const port = this.config.webUIPort || 4409;
+        const base = utils.getHttpBase(this.config);
 
-        if (!ip) {
+        if (!base) {
             this.log.debug('webUIServer not configured – skipping metadata fetch');
             return;
         }
 
+        // In-flight guard: several notify_status_update frames can announce the same
+        // new filename almost simultaneously. Only one fetch per file may run.
+        if (this._metadataInFlight.has(filename)) {
+            this.log.debug(`Metadata fetch for "${filename}" already in flight – skipping`);
+            return;
+        }
+        this._metadataInFlight.add(filename);
+
         const filePath = filename.includes('/') ? filename : `gcodes/${filename}`;
         const encodedPath = filePath.split('/').map(part => encodeURIComponent(part)).join('/');
-        const url = `http://${ip}:${port}/server/files/metadata?filename=${encodedPath}`;
-        this.setStateChanged('info.dataError', '', true);
+        const url = `${base}/server/files/metadata?filename=${encodedPath}`;
 
         try {
-            const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+            const response = await utils.fetchWithRetry(url, { method: 'GET' }, { timeoutMs: 5000 });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -461,15 +502,19 @@ class anycubic extends core.Adapter {
                 this.log.debug(`Thumbnails data written to job.metadata for "${filename}" (${result.thumbnails.length} entries)`);
             }
 
-            // Clear data error on successful fetch
-            this.setStateChanged('info.dataError', '', true);
+            // Clear only this source's error — other sources (upload, command, ...)
+            // stay visible in info.dataError.
+            utils.clearDataError(this, ERR_SOURCE_METADATA);
         } catch (err) {
             if (err.name === 'AbortError' || err.name === 'TimeoutError') {
                 this.log.warn(`Metadata fetch timed out for "${filename}"`);
             } else {
                 this.log.warn(`Metadata fetch error for "${filename}": ${err.message}`);
             }
-            this.setStateChanged('info.dataError', err.message, true);
+            utils.setDataError(this, ERR_SOURCE_METADATA, err.message || String(err));
+        } finally {
+            // Release the in-flight guard so a later refresh can fetch again
+            this._metadataInFlight.delete(filename);
         }
     }
 
@@ -569,7 +614,6 @@ class anycubic extends core.Adapter {
                     this.websocketController.closeConnection();
                 } catch (e) {
                     this.log.error(e);
-                    this.setStateChanged('info.dataError', e.message || String(e), true);
                 }
             }
             // info.connection must NOT go through buffer — write immediately
