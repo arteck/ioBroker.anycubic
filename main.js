@@ -104,11 +104,11 @@ class anycubic extends core.Adapter {
             await this.subscribeForeignStatesAsync(this.energyId);
         }
 
-        // Prüfen ob energy_id konfiguriert ist und der Wert false ist
+        // Prüfen ob energy_id konfiguriert ist und der ausgelesene Wert nicht true ist
         if (this.energyId) {
             const energyState = await this.getStateAsync(this.energyId);
-            if (energyState && energyState.val === false) {
-                this.log.info('Energy is off - not starting WebSocket connection. Toggle energy to connect.');
+            if (!energyState || energyState.val !== true) {
+                this.log.info('Energy is not true - not starting WebSocket connection. Toggle energy to connect.');
                 this.setStateChanged('info.connection', false, true);
                 this.allNodesCreated = true;
                 this.subscribeStates('info.getInfo');
