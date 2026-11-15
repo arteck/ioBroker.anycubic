@@ -106,7 +106,7 @@ class anycubic extends core.Adapter {
 
         // Prüfen ob energy_id konfiguriert ist und der ausgelesene Wert nicht true ist
         if (this.energyId) {
-            const energyState = await this.getStateAsync(this.energyId);
+            const energyState = await this.getForeignStateAsync(this.energyId);
             if (!energyState || energyState.val !== true) {
                 this.log.info('Energy is not true - not starting WebSocket connection. Toggle energy to connect.');
                 this.setStateChanged('info.connection', false, true);
@@ -139,11 +139,11 @@ class anycubic extends core.Adapter {
      */
     async _restoreProgressCache() {
         try {
-            const est = await this.getStateAsync('job.metadata.estimated_time');
+            const est = await this.getForeignStateAsync('job.metadata.estimated_time');
             if (est && typeof est.val === 'number') {
                 this.estimatedTime = est.val;
             }
-            const fn = await this.getStateAsync('print_stats.filename');
+            const fn = await this.getForeignStateAsync('print_stats.filename');
             if (fn && typeof fn.val === 'string' && fn.val) {
                 this.lastFilename = fn.val;
             }
@@ -365,13 +365,13 @@ class anycubic extends core.Adapter {
         // Moonraker sends incremental diffs, so a single field may not yet be cached
         // even though its state already exists in the object tree.
         if (this.printDuration == null) {
-            const s = await this.getStateAsync('print_stats.print_duration');
+            const s = await this.getForeignStateAsync('print_stats.print_duration');
             if (s && typeof s.val === 'number') {
                 this.printDuration = s.val;
             }
         }
         if (this.printProgress == null) {
-            const s = await this.getStateAsync('virtual_sdcard.progress');
+            const s = await this.getForeignStateAsync('virtual_sdcard.progress');
             if (s && typeof s.val === 'number') {
                 this.printProgress = s.val;
             }
@@ -379,13 +379,13 @@ class anycubic extends core.Adapter {
 
         // Layer-Informationen werden weiterhin geladen für andere Zwecke
         if (this.currentLayer == null) {
-            const s = await this.getStateAsync('print_stats.info.current_layer');
+            const s = await this.getForeignStateAsync('print_stats.info.current_layer');
             if (s && typeof s.val === 'number') {
                 this.currentLayer = s.val;
             }
         }
         if (this.totalLayer == null) {
-            const s = await this.getStateAsync('print_stats.info.total_layer');
+            const s = await this.getForeignStateAsync('print_stats.info.total_layer');
             if (s && typeof s.val === 'number') {
                 this.totalLayer = s.val;
             }
